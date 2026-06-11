@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Corner Radius - Modern rounded design -->
+    <dimen name="corner_radius_small">6dp</dimen>
+    <dimen name="corner_radius_medium">12dp</dimen>
+    <dimen name="corner_radius_card">16dp</dimen>
+    <dimen name="corner_radius_large">20dp</dimen>
+    <dimen name="corner_radius_xlarge">28dp</dimen>
+    <dimen name="corner_radius_button">28dp</dimen>
+    <dimen name="corner_radius_pill">100dp</dimen>
+    <dimen name="corner_radius_cover">24dp</dimen>
+
+    <!-- Spacing - Generous but balanced -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_base">16dp</dimen>
+    <dimen name="spacing_lg">20dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_xxl">32dp</dimen>
+    <dimen name="spacing_xxxl">48dp</dimen>
+
+    <!-- Content Padding -->
+    <dimen name="content_padding">16dp</dimen>
+    <dimen name="content_padding_horizontal">20dp</dimen>
+    <dimen name="content_padding_vertical">16dp</dimen>
+    <dimen name="screen_padding">20dp</dimen>
+
+    <!-- Elevation - Subtle shadows -->
+    <dimen name="elevation_none">0dp</dimen>
+    <dimen name="elevation_low">1dp</dimen>
+    <dimen name="elevation_medium">3dp</dimen>
+    <dimen name="elevation_high">6dp</dimen>
+    <dimen name="elevation_floating">12dp</dimen>
+
+    <!-- Icon Sizes -->
+    <dimen name="icon_size_small">18dp</dimen>
+    <dimen name="icon_size_default">24dp</dimen>
+    <dimen name="icon_size_medium">32dp</dimen>
+    <dimen name="icon_size_large">48dp</dimen>
+    <dimen name="icon_size_xlarge">64dp</dimen>
+
+    <!-- Cover Art Sizes -->
+    <dimen name="cover_size_mini">52dp</dimen>
+    <dimen name="cover_size_small">64dp</dimen>
+    <dimen name="cover_size_medium">80dp</dimen>
+    <dimen name="cover_size_large">140dp</dimen>
+    <dimen name="cover_size_player">300dp</dimen>
+    <dimen name="cover_size_player_land">340dp</dimen>
+
+    <!-- Control Button Sizes - Larger touch targets -->
+    <dimen name="control_button_small">44dp</dimen>
+    <dimen name="control_button_default">52dp</dimen>
+    <dimen name="control_button_large">56dp</dimen>
+    <dimen name="control_button_play">72dp</dimen>
+    <dimen name="control_button_play_land">80dp</dimen>
+
+    <!-- Mini Player -->
+    <dimen name="mini_player_height">68dp</dimen>
+
+    <!-- Bottom Navigation -->
+    <dimen name="bottom_nav_height">64dp</dimen>
+
+    <!-- Navigation Rail -->
+    <dimen name="nav_rail_width">80dp</dimen>
+
+    <!-- Card Sizes -->
+    <dimen name="chart_card_height">84dp</dimen>
+    <dimen name="library_card_height">84dp</dimen>
+    <dimen name="library_card_height_land">108dp</dimen>
+
+    <!-- Song Item -->
+    <dimen name="song_item_height">76dp</dimen>
+
+    <!-- Lyric Line -->
+    <dimen name="lyric_line_min_height">52dp</dimen>
+    <dimen name="lyric_text_size">18sp</dimen>
+    <dimen name="lyric_text_size_highlight">24sp</dimen>
+
+    <!-- Font Sizes - Clear hierarchy -->
+    <dimen name="text_size_title">24sp</dimen>
+    <dimen name="text_size_subtitle">16sp</dimen>
+    <dimen name="text_size_body">14sp</dimen>
+    <dimen name="text_size_small">12sp</dimen>
+    <dimen name="text_size_large">20sp</dimen>
+    <dimen name="text_size_large_title">32sp</dimen>
+    <dimen name="text_size_player_title">26sp</dimen>
+    <dimen name="text_size_player_artist">18sp</dimen>
+    <dimen name="text_size_section">20sp</dimen>
+
+    <!-- Stroke Width -->
+    <dimen name="stroke_width_thin">0.5dp</dimen>
+    <dimen name="stroke_width_default">1dp</dimen>
+
+    <!-- Landscape Specific -->
+    <dimen name="land_album_panel_width_ratio">0.4</dimen>
+    <dimen name="land_controls_panel_width_ratio">0.6</dimen>
+    <dimen name="land_control_bar_height">88dp</dimen>
+    <dimen name="land_padding">28dp</dimen>
+    <dimen name="land_cover_margin">36dp</dimen>
+</resources>

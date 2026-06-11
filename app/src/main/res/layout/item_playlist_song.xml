@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:background="?attr/selectableItemBackground"
+    android:contentDescription="歌曲"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="@dimen/spacing_base">
+
+    <!-- Position number -->
+    <TextView
+        android:id="@+id/tvPosition"
+        android:layout_width="24dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/text_size_subtitle" />
+
+    <!-- Cover thumbnail -->
+    <ImageView
+        android:id="@+id/ivCover"
+        android:layout_width="@dimen/cover_size_mini"
+        android:layout_height="@dimen/cover_size_mini"
+        android:layout_marginStart="@dimen/spacing_md"
+        android:contentDescription="封面"
+        android:scaleType="centerCrop" />
+
+    <!-- Song info -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/spacing_md"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_size_subtitle" />
+
+        <TextView
+            android:id="@+id/tvArtist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_xs"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_size_body" />
+    </LinearLayout>
+</LinearLayout>

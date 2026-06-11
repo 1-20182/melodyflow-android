@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="@dimen/spacing_sm"
+    android:layout_marginBottom="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
+    app:cardBackgroundColor="@color/card_background"
+    app:cardCornerRadius="@dimen/corner_radius_card"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/spacing_md">
+
+        <!-- Cover thumbnail with rounded corners - 左侧 -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/coverContainer"
+            android:layout_width="@dimen/cover_size_small"
+            android:layout_height="@dimen/cover_size_small"
+            app:cardCornerRadius="@dimen/corner_radius_medium"
+            app:cardElevation="2dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ImageView
+                android:id="@+id/ivCover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="封面"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_music_note" />
+        </androidx.cardview.widget.CardView>
+
+        <!-- 中间区域：歌曲名称和歌手 - 居中对齐 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/actionContainer"
+            app:layout_constraintStart_toEndOf="@id/coverContainer"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Song title -->
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="middle"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:gravity="center" />
+
+            <!-- Artist name -->
+            <TextView
+                android:id="@+id/tvArtist"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- 右侧操作按钮区域 -->
+        <LinearLayout
+            android:id="@+id/actionContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Cache indicator -->
+            <ImageView
+                android:id="@+id/ivCached"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="@dimen/spacing_sm"
+                android:contentDescription="缓存状态"
+                android:visibility="gone"
+                app:tint="@color/primary" />
+
+            <!-- Cache button -->
+            <ImageButton
+                android:id="@+id/btnCache"
+                android:layout_width="@dimen/control_button_small"
+                android:layout_height="@dimen/control_button_small"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="缓存"
+                android:src="@drawable/ic_download"
+                app:tint="@color/text_secondary" />
+
+            <!-- Favorite button -->
+            <ImageButton
+                android:id="@+id/btnFavorite"
+                android:layout_width="@dimen/control_button_small"
+                android:layout_height="@dimen/control_button_small"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="收藏"
+                android:src="@drawable/ic_favorite_border"
+                app:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

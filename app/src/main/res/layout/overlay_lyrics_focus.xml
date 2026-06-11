@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/lyricsFocusRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Semi-transparent background -->
+    <View
+        android:id="@+id/lyricsBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0.95"
+        android:background="@color/background" />
+
+    <!-- Lyrics Container -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvLyricsFocus"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingTop="100dp"
+        android:paddingBottom="100dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintWidth_percent="0.85" />
+
+    <!-- No lyrics message -->
+    <TextView
+        android:id="@+id/tvNoLyricsFocus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="暂无歌词"
+        android:textColor="@color/text_tertiary"
+        android:textSize="@dimen/text_size_body"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Close lyrics button -->
+    <ImageButton
+        android:id="@+id/btnCloseLyrics"
+        android:layout_width="@dimen/control_button_default"
+        android:layout_height="@dimen/control_button_default"
+        android:layout_marginTop="@dimen/spacing_lg"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="关闭歌词"
+        android:src="@drawable/ic_expand_more"
+        android:rotation="180"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/text_secondary" />
+</androidx.constraintlayout.widget.ConstraintLayout>

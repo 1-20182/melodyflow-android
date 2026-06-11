@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base dark theme -->
+    <color name="background">#090909</color>
+    <color name="surface">#121212</color>
+    <color name="surface_variant">#1A1A1A</color>
+    <color name="surface_elevated">#202020</color>
+    <color name="card_background">#151515</color>
+    <color name="card_background_elevated">#1E1E1E</color>
+
+    <!-- Primary green - Spotify inspired but refined -->
+    <color name="primary">#1DB954</color>
+    <color name="primary_variant">#1AA34A</color>
+    <color name="primary_dark">#148F3E</color>
+    <color name="primary_light">#4AE07D</color>
+    <color name="primary_soft">#2DDA6A</color>
+    <color name="primary_glow">#401DB954</color>
+
+    <!-- Accent colors -->
+    <color name="accent">#FF6B6B</color>
+    <color name="accent_variant">#FF8A80</color>
+    <color name="accent_soft">#FF8E8E</color>
+
+    <!-- Text hierarchy -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#B3B3B3</color>
+    <color name="text_tertiary">#737373</color>
+    <color name="text_disabled">#525252</color>
+    <color name="text_hint">#404040</color>
+    <color name="text_on_primary">#000000</color>
+
+    <!-- Dividers & separators -->
+    <color name="divider">#262626</color>
+    <color name="divider_light">#303030</color>
+    <color name="divider_soft">#1A1A1A</color>
+
+    <!-- States -->
+    <color name="error">#FF5252</color>
+    <color name="success">#1DB954</color>
+    <color name="warning">#FFC107</color>
+
+    <!-- Gradients -->
+    <color name="gradient_start">#1DB954</color>
+    <color name="gradient_end">#148F3E</color>
+    <color name="gradient_soft_start">#2DDA6A</color>
+    <color name="gradient_soft_end">#1AA34A</color>
+
+    <!-- Glassmorphism enhancements -->
+    <color name="glass_background">#D4121212</color>
+    <color name="glass_background_light">#A8121212</color>
+    <color name="glass_background_heavy">#F0121212</color>
+    <color name="glass_border">#18FFFFFF</color>
+    <color name="glass_border_light">#25FFFFFF</color>
+    <color name="glass_highlight">#12FFFFFF</color>
+    <color name="glass_scrim">#80000000</color>
+    <color name="glass_glow">#081DB954</color>
+    <color name="overlay">#15000000</color>
+
+    <!-- Mini player -->
+ <color name="mini_player_bg">#E6121212</color>
+    <color name="mini_player_border">#18FFFFFF</color>
+
+    <!-- Control bar -->
+    <color name="control_bar_bg">#F0121212</color>
+    <color name="control_bar_border">#14FFFFFF</color>
+
+    <!-- Lyrics -->
+    <color name="lyrics_panel_bg">#F0121212</color>
+    <color name="lyrics_highlight_bg">#351DB954</color>
+    <color name="lyric_highlight_bg">#281DB954</color>
+    <color name="lyric_past">#CC737373</color>
+    <color name="lyric_future">#CCB3B3B3</color>
+    <color name="lyric_current_text">#FFFFFFFF</color>
+
+    <!-- Landscape -->
+    <color name="landscape_bg">#FF090909</color>
+    <color name="landscape_panel">#F0121212</color>
+    <color name="landscape_card">#FF202020</color>
+    <color name="landscape_divider">#FF262626</color>
+    <color name="landscape_dot_active">#FF1DB954</color>
+    <color name="landscape_dot_inactive">#FF666666</color>
+    <color name="landscape_text_primary">#FFFFFFFF</color>
+    <color name="landscape_text_secondary">#FFB3B3B3</color>
+    <color name="landscape_control_tint">#FFFFFFFF</color>
+    <color name="landscape_lyric_highlight_bg">#281DB954</color>
+    <color name="landscape_lyric_past">#CC737373</color>
+    <color name="landscape_lyric_future">#CCB3B3B3</color>
+    <color name="landscape_lyric_current_text">#FFFFFFFF</color>
+
+    <!-- Navigation rail -->
+    <color name="nav_rail_bg">#FF090909</color>
+    <color name="nav_rail_item_active">#FF1DB954</color>
+    <color name="nav_rail_item_inactive">#FFB3B3B3</color>
+
+    <!-- Launcher -->
+    <color name="ic_launcher_background">#FF090909</color>
+</resources>

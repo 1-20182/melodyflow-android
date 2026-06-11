@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 圆形渐变背景 -->
+    <path
+        android:fillColor="#07C160"
+        android:pathData="M54,18m-32,0a32,32 0,1 1,64 0a32,32 0,1 1,-64 0" />
+    <!-- 音乐音符 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,72c-7.2,0 -13,-3.58 -13,-8s5.8,-8 13,-8c2.16,0 4.2,0.33 5.98,0.9V38.2l-11.4,2.2c-1.64,0.32 -3.26,-0.72 -3.6,-2.32 -0.34,-1.6 0.72,-3.2 2.36,-3.52l16.8,-3.24c1.64,-0.32 3.26,0.72 3.6,2.32 0.02,0.1 0.04,0.2 0.04,0.3v25.52c0,4.42 -5.8,8 -13,8zM54,58c-5.08,0 -9,1.79 -9,4s3.92,4 9,4 9,-1.79 9,-4 -3.92,-4 -9,-4z" />
+    <!-- 高光弧线 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.3"
+        android:pathData="M54,22c-7.5,0 -14.38,2.57 -19.85,6.84l3.59,4.72C42.18,29.92 47.91,28 54,28c14.36,0 26,11.64 26,26h6c0-17.67-14.33-32-32-32z" />
+</vector>

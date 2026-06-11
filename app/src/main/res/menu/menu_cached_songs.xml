@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <item
+        android:id="@+id/action_backup"
+        android:title="备份数据"
+        android:icon="@android:drawable/ic_menu_save"
+        app:showAsAction="ifRoom" />
+    
+    <item
+        android:id="@+id/action_restore"
+        android:title="恢复数据"
+        android:icon="@android:drawable/ic_menu_upload"
+        app:showAsAction="never" />
+    
+    <item
+        android:id="@+id/action_rescan"
+        android:title="重新扫描"
+        android:icon="@android:drawable/ic_menu_rotate"
+        app:showAsAction="never" />
+    
+</menu>
