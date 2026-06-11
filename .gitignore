@@ -100,3 +100,7 @@ lint/tmp/
 # App specific
 app/release/
 app/debug/
+
+# Gradle cache
+gradle-home/
+gradle-tmp/
