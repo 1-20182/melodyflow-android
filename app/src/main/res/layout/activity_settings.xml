@@ -156,6 +156,100 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Startup Page Card -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.MelodyFlow.GlassCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_base">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="启动页面"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_size_section"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="选择启动应用时默认显示的页面"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_subtitle" />
+
+                    <RadioGroup
+                        android:id="@+id/rgStartupPage"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:orientation="vertical">
+
+                        <RadioButton
+                            android:id="@+id/rbStartupHome"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="主页（推荐、排行榜）"
+                            android:textColor="@color/text_primary"
+                            android:textSize="@dimen/text_size_subtitle" />
+
+                        <RadioButton
+                            android:id="@+id/rbStartupAI"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="AI音乐推荐"
+                            android:textColor="@color/text_primary"
+                            android:textSize="@dimen/text_size_subtitle" />
+                    </RadioGroup>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- AI Recommendation Card -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.MelodyFlow.GlassCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_base">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="AI音乐推荐"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_size_section"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="配置AI API，获取个性化歌曲推荐"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_subtitle" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAISettings"
+                        style="@style/Widget.MelodyFlow.Button.Primary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="AI推荐设置" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Gradient Preset Card -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.MelodyFlow.GlassCard"
@@ -280,6 +374,14 @@
                         android:text="@string/setting_version"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_size_subtitle" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnViewChangelog"
+                        style="@style/Widget.MelodyFlow.Button.Outline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="查看更新日志" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

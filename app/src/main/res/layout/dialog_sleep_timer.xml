@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@color/surface">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="定时关闭"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@color/text_primary"
+        android:layout_marginBottom="16dp"/>
+
+    <TextView
+        android:id="@+id/tvCurrentTimer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="未设置定时关闭"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:layout_marginBottom="16dp"
+        android:visibility="gone"/>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/background"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="0dp"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="按歌曲剩余时长"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnEndOfSong"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="播放完当前歌曲"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAfter1Song"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="再播1首"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAfter2Songs"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="再播2首"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/background"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="0dp"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="按固定时长"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="8dp"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn15Min"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="15分钟"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn30Min"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="30分钟"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn60Min"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="60分钟"
+                    android:textSize="13sp"
+                    app:cornerRadius="8dp"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_margin="4dp"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCancelTimer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="取消定时"
+            android:textColor="@color/text_secondary"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_marginEnd="8dp"
+            android:visibility="gone"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnClose"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="关闭"
+            style="@style/Widget.Material3.Button.TextButton"/>
+
+    </LinearLayout>
+
+</LinearLayout>

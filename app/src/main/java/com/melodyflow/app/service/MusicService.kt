@@ -50,6 +50,7 @@ class MusicService : MediaBrowserServiceCompat() {
         fun onSongChanged(song: Song?)
         fun onPlayStateChanged(isPlaying: Boolean)
         fun onError(message: String)
+        fun onSongCompleted() {}
     }
 
     private val playbackListeners = mutableListOf<PlaybackListener>()
@@ -74,6 +75,10 @@ class MusicService : MediaBrowserServiceCompat() {
 
     private fun notifyError(message: String) {
         handler.post { playbackListeners.forEach { it.onError(message) } }
+    }
+
+    private fun notifySongCompleted() {
+        handler.post { playbackListeners.forEach { it.onSongCompleted() } }
     }
 
     private lateinit var mediaSession: MediaSessionCompat
@@ -505,10 +510,18 @@ class MusicService : MediaBrowserServiceCompat() {
                     failedTimestamps.remove(song.id)
                     songFailCount = maxOf(0, songFailCount - 1)
 
+                    // 自动缓存：只缓存用户喜欢的歌曲
                     if (!isCached) {
                         serviceScope.launch(Dispatchers.IO) {
                             try {
-                                cacheManager.cacheSong(song.copy(url = path))
+                                // 检查歌曲是否在收藏列表中
+                                val isFavorite = musicRepository.isFavoriteSync(song.id)
+                                if (isFavorite) {
+                                    android.util.Log.i("MusicService", "Auto-caching favorite song: ${song.name}")
+                                    cacheManager.cacheSong(song.copy(url = path))
+                                } else {
+                                    android.util.Log.d("MusicService", "Skipping cache for non-favorite song: ${song.name}")
+                                }
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -522,6 +535,7 @@ class MusicService : MediaBrowserServiceCompat() {
                         return@setOnCompletionListener
                     }
                     notifyPlayStateChanged(false)
+                    notifySongCompleted()
                     when (playMode) {
                         PlayMode.SINGLE -> playCurrent()
                         else -> {

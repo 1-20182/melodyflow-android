@@ -31,6 +31,9 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var btnSelectBackground: MaterialButton
     private lateinit var btnResetBackground: MaterialButton
     private lateinit var gradientPresetGroup: RadioGroup
+    private lateinit var rgStartupPage: RadioGroup
+    private lateinit var rbStartupHome: RadioButton
+    private lateinit var rbStartupAI: RadioButton
 
     private val bgFile: File get() = File(filesDir, "custom_background.jpg")
     private val cacheManager: CacheManager by lazy { CacheManager.getInstance(this) }
@@ -67,11 +70,15 @@ class SettingsActivity : AppCompatActivity() {
         btnSelectBackground = findViewById(R.id.btnSelectBackground)
         btnResetBackground = findViewById(R.id.btnResetBackground)
         gradientPresetGroup = findViewById(R.id.gradientPresetGroup)
+        rgStartupPage = findViewById(R.id.rgStartupPage)
+        rbStartupHome = findViewById(R.id.rbStartupHome)
+        rbStartupAI = findViewById(R.id.rbStartupAI)
 
         updateCacheSize()
         updateMusicCacheSize()
         loadBackgroundPreview()
         setupGradientPresets()
+        setupStartupPageSettings()
 
         btnClearCache.setOnClickListener { clearCache() }
         btnClearMusicCache.setOnClickListener { clearMusicCache() }
@@ -81,6 +88,18 @@ class SettingsActivity : AppCompatActivity() {
         btnResetBackground.setOnClickListener { resetBackground() }
         gradientPresetGroup.setOnCheckedChangeListener { _, checkedId ->
             applyGradientPreset(checkedId)
+        }
+
+        // AI Settings button
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAISettings)?.setOnClickListener {
+            startActivity(Intent(this, AISettingsActivity::class.java))
+        }
+
+        // View Changelog button
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btnViewChangelog)?.setOnClickListener {
+            startActivity(Intent(this, InfoDialogActivity::class.java).apply {
+                putExtra(InfoDialogActivity.EXTRA_SHOW_ONLY_CHANGELOG, true)
+            })
         }
     }
 
@@ -104,6 +123,27 @@ class SettingsActivity : AppCompatActivity() {
             }
             radioButton.background = gradientDrawable
             gradientPresetGroup.addView(radioButton)
+        }
+    }
+
+    private fun setupStartupPageSettings() {
+        val prefs = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
+        val startupPage = prefs.getString("startup_page", "home") ?: "home"
+
+        // 设置初始选中状态
+        when (startupPage) {
+            "ai" -> rbStartupAI.isChecked = true
+            else -> rbStartupHome.isChecked = true
+        }
+
+        // 监听选择变化
+        rgStartupPage.setOnCheckedChangeListener { _, checkedId ->
+            val selectedPage = when (checkedId) {
+                R.id.rbStartupAI -> "ai"
+                else -> "home"
+            }
+            prefs.edit().putString("startup_page", selectedPage).apply()
+            Toast.makeText(this, "启动页面已设置", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -237,6 +277,14 @@ class SettingsActivity : AppCompatActivity() {
         editor.remove("gradient_end")
         editor.apply()
         gradientPresetGroup.clearCheck()
+
+        // Clear background cache and apply
+        com.melodyflow.app.util.BackgroundManager.clearCache()
+        com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
+
+        // Send broadcast to notify other activities
+        sendBroadcast(Intent("com.melodyflow.app.BACKGROUND_CHANGED"))
+
         loadBackgroundPreview()
         Toast.makeText(this, "已恢复默认背景", Toast.LENGTH_SHORT).show()
     }

@@ -92,6 +92,16 @@
             android:exported="false"
             android:screenOrientation="unspecified" />
 
+        <activity
+            android:name=".ui.AISettingsActivity"
+            android:exported="true"
+            android:screenOrientation="unspecified" />
+
+        <activity
+            android:name=".ui.AIRecommendationActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified" />
+
         <service
             android:name=".service.MusicService"
             android:enabled="true"

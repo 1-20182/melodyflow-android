@@ -33,11 +33,17 @@ object BackgroundManager {
         val bgFile = File(activity.filesDir, BG_FILE_NAME)
         val decorView = activity.window.decorView
 
+        // 清除之前的背景
+        decorView.background = null
+
         if (bgFile.exists()) {
+            android.util.Log.i("BackgroundManager", "Applying custom background: ${bgFile.absolutePath}")
+
             // Check memory cache first
             val cacheKey = bgFile.absolutePath
             val cachedBitmap = bitmapCache.get(cacheKey)
             if (cachedBitmap != null) {
+                android.util.Log.i("BackgroundManager", "Using cached bitmap")
                 decorView.background = BitmapDrawable(activity.resources, cachedBitmap)
                 return
             }
@@ -49,24 +55,47 @@ object BackgroundManager {
                 }
                 BitmapFactory.decodeFile(bgFile.absolutePath, options)
 
+                android.util.Log.i("BackgroundManager", "Image dimensions: ${options.outWidth}x${options.outHeight}")
+
+                // 获取屏幕尺寸作为后备
+                val displayMetrics = activity.resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels
+                val screenHeight = displayMetrics.heightPixels
+
                 // Calculate inSampleSize for memory efficiency
-                options.inSampleSize = calculateInSampleSize(options, decorView.width, decorView.height)
+                // 使用屏幕尺寸而不是decorView尺寸，因为decorView可能还没有布局完成
+                val targetWidth = if (decorView.width > 0) decorView.width else screenWidth
+                val targetHeight = if (decorView.height > 0) decorView.height else screenHeight
+
+                options.inSampleSize = calculateInSampleSize(options, targetWidth, targetHeight)
                 options.inJustDecodeBounds = false
+                options.inPreferredConfig = Bitmap.Config.RGB_565 // 节省内存
+
+                android.util.Log.i("BackgroundManager", "Loading bitmap with inSampleSize: ${options.inSampleSize}")
 
                 val bitmap = BitmapFactory.decodeFile(bgFile.absolutePath, options)
                 if (bitmap != null) {
                     bitmapCache.put(cacheKey, bitmap)
-                    decorView.background = BitmapDrawable(activity.resources, bitmap)
+                    val drawable = BitmapDrawable(activity.resources, bitmap)
+                    drawable.setAntiAlias(true)
+                    decorView.background = drawable
+                    android.util.Log.i("BackgroundManager", "Background applied successfully")
+                } else {
+                    android.util.Log.e("BackgroundManager", "Failed to decode bitmap")
                 }
             } catch (e: Exception) {
+                android.util.Log.e("BackgroundManager", "Error loading background", e)
                 e.printStackTrace()
             }
         } else if (gradientStart != 0 && gradientEnd != 0) {
+            android.util.Log.i("BackgroundManager", "Applying gradient background")
             val drawable = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(gradientStart, gradientEnd)
             )
             decorView.background = drawable
+        } else {
+            android.util.Log.i("BackgroundManager", "No custom background set")
         }
     }
 

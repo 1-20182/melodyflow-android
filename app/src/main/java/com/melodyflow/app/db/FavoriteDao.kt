@@ -25,4 +25,7 @@ interface FavoriteDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :id)")
     fun isFavorite(id: String): Flow<Boolean>
+
+    @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :id)")
+    suspend fun isFavoriteSync(id: String): Boolean
 }

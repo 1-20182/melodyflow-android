@@ -5,11 +5,25 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [FavoriteEntity::class, HistoryEntity::class, CacheEntity::class], version = 4, exportSchema = false)
+@Database(
+    entities = [
+        FavoriteEntity::class,
+        HistoryEntity::class,
+        CacheEntity::class,
+        AIConfigEntity::class,
+        AIRecommendationEntity::class,
+        UserConversationEntity::class
+    ],
+    version = 5,
+    exportSchema = false
+)
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
     abstract fun historyDao(): HistoryDao
     abstract fun cacheDao(): CacheDao
+    abstract fun aiConfigDao(): AIConfigDao
+    abstract fun aiRecommendationDao(): AIRecommendationDao
+    abstract fun userConversationDao(): UserConversationDao
 
     companion object {
         @Volatile

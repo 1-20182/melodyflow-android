@@ -97,6 +97,21 @@ class PlayerActivity : AppCompatActivity() {
     private var retainedSong: Song? = null
     private var retainedIsPlaying = false
 
+    // Sleep timer
+    private var sleepTimerHandler: Handler? = null
+    private var sleepTimerRunnable: Runnable? = null
+    private var sleepTimerEndTime: Long = 0
+    private var isSleepTimerActive = false
+    private var sleepTimerMode: SleepTimerMode = SleepTimerMode.OFF
+    private var remainingSongsCount: Int = 0  // 剩余需要播放的歌曲数量
+
+    enum class SleepTimerMode {
+        OFF,           // 未开启
+        FIXED_TIME,    // 固定时长（15/30/60分钟）
+        END_OF_SONG,   // 播放完当前歌曲
+        AFTER_SONGS    // 播放完指定数量的歌曲
+    }
+
     // Cover rotation animation
     private var rotationAnimator: ValueAnimator? = null
     private var isPlaying = false
@@ -160,6 +175,10 @@ class PlayerActivity : AppCompatActivity() {
 
         override fun onError(message: String) {
             Toast.makeText(this@PlayerActivity, message, Toast.LENGTH_SHORT).show()
+        }
+
+        override fun onSongCompleted() {
+            this@PlayerActivity.onSongCompleted()
         }
     }
 
@@ -282,6 +301,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         rotationAnimator?.cancel()
         handler.removeCallbacks(updateProgressRunnable)
+        cancelSleepTimer()
         musicService?.removePlaybackListener(playbackListener)
         if (serviceBound) {
             unbindService(serviceConnection)
@@ -814,11 +834,20 @@ class PlayerActivity : AppCompatActivity() {
         android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initPlayer START, musicService=$musicService, currentSong=$currentSong, retainedSong=$retainedSong")
         // #endregion
         musicService?.let { service ->
+            val autoPlay = intent.getBooleanExtra("autoPlay", false)
+
             if (pendingPlaylist != null && clickIndexExtra >= 0) {
                 service.setPlaylist(pendingPlaylist!!, clickIndexExtra)
+                // 如果设置了自动播放，则开始播放
+                if (autoPlay && !service.isPlaying()) {
+                    service.playCurrent()
+                }
             } else if (currentSong != null) {
                 if (service.getCurrentSong()?.id != currentSong?.id) {
                     service.playSong(currentSong!!)
+                } else if (autoPlay && !service.isPlaying()) {
+                    // 同一首歌但要求自动播放且当前未播放
+                    service.playCurrent()
                 }
             }
 
@@ -845,6 +874,182 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showMoreDialog() {
+        android.util.Log.d("PlayerActivity", "showMoreDialog: START")
+        val dialog = BottomSheetDialog(this)
+        val view = layoutInflater.inflate(R.layout.dialog_sleep_timer, null)
+        dialog.setContentView(view)
+        android.util.Log.d("PlayerActivity", "showMoreDialog: dialog content set")
+
+        val tvCurrentTimer = view.findViewById<TextView>(R.id.tvCurrentTimer)
+        val btn15Min = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn15Min)
+        val btn30Min = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn30Min)
+        val btn60Min = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn60Min)
+        val btnEndOfSong = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnEndOfSong)
+        val btnAfter1Song = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAfter1Song)
+        val btnAfter2Songs = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnAfter2Songs)
+        val btnCancelTimer = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCancelTimer)
+        val btnClose = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnClose)
+
+        // Update current timer status
+        if (isSleepTimerActive) {
+            val statusText = when (sleepTimerMode) {
+                SleepTimerMode.FIXED_TIME -> {
+                    val remainingMinutes = ((sleepTimerEndTime - System.currentTimeMillis()) / 60000).toInt()
+                    if (remainingMinutes > 0) "定时关闭：剩余 ${remainingMinutes} 分钟" else null
+                }
+                SleepTimerMode.END_OF_SONG -> "定时关闭：播放完当前歌曲"
+                SleepTimerMode.AFTER_SONGS -> "定时关闭：再播${remainingSongsCount}首后关闭"
+                else -> null
+            }
+            if (statusText != null) {
+                tvCurrentTimer.text = statusText
+                tvCurrentTimer.visibility = View.VISIBLE
+                btnCancelTimer.visibility = View.VISIBLE
+            } else {
+                cancelSleepTimer()
+                tvCurrentTimer.visibility = View.GONE
+                btnCancelTimer.visibility = View.GONE
+            }
+        } else {
+            tvCurrentTimer.visibility = View.GONE
+            btnCancelTimer.visibility = View.GONE
+        }
+
+        // 按歌曲剩余时长 - 播放完当前歌曲
+        btnEndOfSong.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btnEndOfSong clicked")
+            setSleepTimerEndOfSong()
+            dialog.dismiss()
+            Toast.makeText(this, "将在当前歌曲播放完毕后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        // 按歌曲剩余时长 - 再播1首
+        btnAfter1Song.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btnAfter1Song clicked")
+            setSleepTimerAfterSongs(1)
+            dialog.dismiss()
+            Toast.makeText(this, "将在播放完下1首歌曲后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        // 按歌曲剩余时长 - 再播2首
+        btnAfter2Songs.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btnAfter2Songs clicked")
+            setSleepTimerAfterSongs(2)
+            dialog.dismiss()
+            Toast.makeText(this, "将在播放完下2首歌曲后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        // 按固定时长
+        btn15Min.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btn15Min clicked")
+            setSleepTimer(15)
+            dialog.dismiss()
+            Toast.makeText(this, "已设置 15 分钟后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        btn30Min.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btn30Min clicked")
+            setSleepTimer(30)
+            dialog.dismiss()
+            Toast.makeText(this, "已设置 30 分钟后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        btn60Min.setOnClickListener {
+            android.util.Log.d("PlayerActivity", "btn60Min clicked")
+            setSleepTimer(60)
+            dialog.dismiss()
+            Toast.makeText(this, "已设置 60 分钟后关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        // Cancel timer
+        btnCancelTimer.setOnClickListener {
+            cancelSleepTimer()
+            dialog.dismiss()
+            Toast.makeText(this, "已取消定时关闭", Toast.LENGTH_SHORT).show()
+        }
+
+        // Close dialog
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+
+    private fun setSleepTimer(minutes: Int) {
+        android.util.Log.d("PlayerActivity", "setSleepTimer: minutes=$minutes")
+        cancelSleepTimer()
+
+        sleepTimerMode = SleepTimerMode.FIXED_TIME
+        sleepTimerHandler = Handler(Looper.getMainLooper())
+        sleepTimerEndTime = System.currentTimeMillis() + (minutes * 60 * 1000)
+        isSleepTimerActive = true
+
+        sleepTimerRunnable = Runnable {
+            android.util.Log.d("PlayerActivity", "sleepTimerRunnable: timer triggered!")
+            stopMusicAndClose()
+        }
+
+        sleepTimerHandler?.postDelayed(sleepTimerRunnable!!, minutes * 60 * 1000L)
+        android.util.Log.d("PlayerActivity", "setSleepTimer: timer scheduled for $minutes minutes")
+    }
+
+    private fun setSleepTimerEndOfSong() {
+        android.util.Log.d("PlayerActivity", "setSleepTimerEndOfSong")
+        cancelSleepTimer()
+        sleepTimerMode = SleepTimerMode.END_OF_SONG
+        isSleepTimerActive = true
+        remainingSongsCount = 0
+    }
+
+    private fun setSleepTimerAfterSongs(songCount: Int) {
+        android.util.Log.d("PlayerActivity", "setSleepTimerAfterSongs: songCount=$songCount")
+        cancelSleepTimer()
+        sleepTimerMode = SleepTimerMode.AFTER_SONGS
+        isSleepTimerActive = true
+        remainingSongsCount = songCount
+    }
+
+    private fun cancelSleepTimer() {
+        android.util.Log.d("PlayerActivity", "cancelSleepTimer")
+        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
+        sleepTimerHandler = null
+        sleepTimerRunnable = null
+        isSleepTimerActive = false
+        sleepTimerEndTime = 0
+        sleepTimerMode = SleepTimerMode.OFF
+        remainingSongsCount = 0
+    }
+
+    private fun stopMusicAndClose() {
+        android.util.Log.d("PlayerActivity", "stopMusicAndClose: stopping music and closing activity")
+        val intent = Intent(this, MusicService::class.java).apply {
+            action = MusicService.ACTION_STOP
+        }
+        startService(intent)
+        finish()
+    }
+
+    fun onSongCompleted() {
+        android.util.Log.d("PlayerActivity", "onSongCompleted: sleepTimerMode=$sleepTimerMode, remainingSongsCount=$remainingSongsCount")
+        if (!isSleepTimerActive) return
+
+        when (sleepTimerMode) {
+            SleepTimerMode.END_OF_SONG -> {
+                android.util.Log.d("PlayerActivity", "onSongCompleted: END_OF_SONG mode, stopping")
+                stopMusicAndClose()
+            }
+            SleepTimerMode.AFTER_SONGS -> {
+                remainingSongsCount--
+                android.util.Log.d("PlayerActivity", "onSongCompleted: AFTER_SONGS mode, remaining=$remainingSongsCount")
+                if (remainingSongsCount <= 0) {
+                    stopMusicAndClose()
+                }
+            }
+            else -> {
+                // FIXED_TIME mode, do nothing here (handled by Handler)
+            }
+        }
     }
 
     private fun showPlaylistDialog() {

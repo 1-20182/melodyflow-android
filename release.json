@@ -1,0 +1,7 @@
+{
+  "tag_name": "v0.1.0",
+  "name": "MelodyFlow v0.1.0",
+  "body": "Initial release of MelodyFlow Android music player.\n\n## Features\n- Music search and online playback\n- Real-time lyrics display with fullscreen mode\n- Favorite songs management\n- Playlist import support\n- Local music scanning\n- Landscape and portrait screen support\n- Material Design 3 UI\n\n## Known Issues\n- Lyrics close button may become unresponsive after multiple open/close cycles. Use back button as workaround.",
+  "draft": false,
+  "prerelease": false
+}

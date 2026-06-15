@@ -6,6 +6,7 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.melodyflow.app.db.*
 import com.melodyflow.app.model.*
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -41,6 +42,9 @@ class MusicRepository private constructor(context: Context) {
     private val db = MusicDatabase.getInstance(context)
     private val favoriteDao = db.favoriteDao()
     private val historyDao = db.historyDao()
+    private val aiConfigDao = db.aiConfigDao()
+    private val aiRecommendationDao = db.aiRecommendationDao()
+    private val userConversationDao = db.userConversationDao()
     private val cacheManager = CacheManager.getInstance(context)
     private val gson = Gson()
 
@@ -705,6 +709,10 @@ class MusicRepository private constructor(context: Context) {
 
     fun isFavorite(songId: String): Flow<Boolean> = favoriteDao.isFavorite(songId)
 
+    suspend fun isFavoriteSync(songId: String): Boolean {
+        return favoriteDao.isFavoriteSync(songId)
+    }
+
     suspend fun clearFavorites() {
         favoriteDao.clearAll()
     }
@@ -844,6 +852,135 @@ class MusicRepository private constructor(context: Context) {
             duration = duration,
             isCached = false,
             source = source.name
+        )
+    }
+
+    // ============================================================
+    // AI Configuration
+    // ============================================================
+
+    suspend fun getAIConfig(): AIConfig? {
+        return aiConfigDao.getConfig()?.toAIConfig()
+    }
+
+    fun getAIConfigFlow(): Flow<AIConfig?> {
+        return aiConfigDao.getConfigFlow().map { it?.toAIConfig() }
+    }
+
+    suspend fun saveAIConfig(config: AIConfig) {
+        aiConfigDao.saveConfig(config.toEntity())
+    }
+
+    suspend fun clearAIConfig() {
+        aiConfigDao.clearConfig()
+    }
+
+    private fun AIConfigEntity.toAIConfig(): AIConfig {
+        return AIConfig(
+            provider = AIProvider.fromString(provider),
+            apiUrl = apiUrl,
+            apiKey = apiKey,
+            model = model,
+            isEnabled = isEnabled
+        )
+    }
+
+    private fun AIConfig.toEntity(): AIConfigEntity {
+        return AIConfigEntity(
+            provider = provider.name,
+            apiUrl = apiUrl,
+            apiKey = apiKey,
+            model = model,
+            isEnabled = isEnabled
+        )
+    }
+
+    // ============================================================
+    // AI Recommendations
+    // ============================================================
+
+    fun getAIRecommendations(): Flow<List<AIRecommendationSession>> {
+        return aiRecommendationDao.getAllRecommendations().map { entities ->
+            entities.map { it.toSession() }
+        }
+    }
+
+    suspend fun saveAIRecommendation(session: AIRecommendationSession): Long {
+        return aiRecommendationDao.insertRecommendation(session.toEntity())
+    }
+
+    suspend fun markRecommendationAsPlayed(id: Long) {
+        aiRecommendationDao.updatePlayedStatus(id, true)
+    }
+
+    suspend fun deleteAIRecommendation(id: Long) {
+        aiRecommendationDao.deleteRecommendation(id)
+    }
+
+    suspend fun clearAIRecommendations() {
+        aiRecommendationDao.clearAllRecommendations()
+    }
+
+    private fun AIRecommendationEntity.toSession(): AIRecommendationSession {
+        val songs = try {
+            gson.fromJson(songsJson, Array<AIRecommendedSong>::class.java).toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return AIRecommendationSession(
+            id = id,
+            timestamp = timestamp,
+            userPrompt = userPrompt,
+            playlistName = playlistName,
+            explanation = explanation,
+            songs = songs,
+            isPlayed = isPlayed
+        )
+    }
+
+    private fun AIRecommendationSession.toEntity(): AIRecommendationEntity {
+        return AIRecommendationEntity(
+            id = id,
+            timestamp = timestamp,
+            userPrompt = userPrompt,
+            playlistName = playlistName,
+            explanation = explanation,
+            songsJson = gson.toJson(songs),
+            isPlayed = isPlayed
+        )
+    }
+
+    // ============================================================
+    // User Conversations
+    // ============================================================
+
+    fun getUserConversations(limit: Int = 50): Flow<List<UserConversation>> {
+        return userConversationDao.getRecentConversations(limit).map { entities ->
+            entities.map { it.toConversation() }
+        }
+    }
+
+    suspend fun saveUserConversation(conversation: UserConversation): Long {
+        return userConversationDao.insertConversation(conversation.toEntity())
+    }
+
+    private fun UserConversationEntity.toConversation(): UserConversation {
+        return UserConversation(
+            id = id,
+            timestamp = timestamp,
+            userMessage = userMessage,
+            aiResponse = aiResponse,
+            type = ConversationType.valueOf(type)
+        )
+    }
+
+    private fun UserConversation.toEntity(): UserConversationEntity {
+        return UserConversationEntity(
+            id = id,
+            timestamp = timestamp,
+            userMessage = userMessage,
+            aiResponse = aiResponse,
+            type = type.name
         )
     }
 }

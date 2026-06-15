@@ -133,10 +133,22 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 检查启动页面设置
+        val prefs = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
+        val startupPage = prefs.getString("startup_page", "home") ?: "home"
+        val hasAgreed = prefs.getBoolean("has_agreed_to_terms", false)
+
+        // 如果设置为AI推荐页面且已同意协议，则跳转到AI推荐页面
+        if (startupPage == "ai" && hasAgreed) {
+            startActivity(Intent(this, AIRecommendationActivity::class.java))
+            // 继续初始化MainActivity，但用户会看到AI页面
+        }
+
         setContentView(R.layout.activity_main)
 
         com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
-        
+
         // Register background change receiver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(backgroundChangeReceiver, IntentFilter("com.melodyflow.app.BACKGROUND_CHANGED"), Context.RECEIVER_NOT_EXPORTED)

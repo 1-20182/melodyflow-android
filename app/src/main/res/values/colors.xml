@@ -16,10 +16,24 @@
     <color name="primary_soft">#2DDA6A</color>
     <color name="primary_glow">#401DB954</color>
 
-    <!-- Accent colors -->
+    <!-- Accent colors - Multi-color system for visual variety -->
     <color name="accent">#FF6B6B</color>
     <color name="accent_variant">#FF8A80</color>
     <color name="accent_soft">#FF8E8E</color>
+
+    <!-- Extended accent palette for variety -->
+    <color name="accent_blue">#4FACFE</color>
+    <color name="accent_blue_light">#00F2FE</color>
+    <color name="accent_purple">#A855F7</color>
+    <color name="accent_purple_light">#C084FC</color>
+    <color name="accent_orange">#FB923C</color>
+    <color name="accent_orange_light">#FDBA74</color>
+    <color name="accent_pink">#EC4899</color>
+    <color name="accent_pink_light">#F472B6</color>
+    <color name="accent_cyan">#22D3EE</color>
+    <color name="accent_cyan_light">#67E8F9</color>
+    <color name="accent_yellow">#FACC15</color>
+    <color name="accent_yellow_light">#FDE047</color>
 
     <!-- Text hierarchy -->
     <color name="text_primary">#FFFFFF</color>
@@ -53,6 +67,7 @@
     <color name="glass_border_light">#25FFFFFF</color>
     <color name="glass_highlight">#12FFFFFF</color>
     <color name="glass_scrim">#80000000</color>
+    <color name="scrim">#B3000000</color>
     <color name="glass_glow">#081DB954</color>
     <color name="overlay">#15000000</color>
 

@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="@color/surface"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- 顶部渐变背景区域 -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_gradient_card_top"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- AI图标 -->
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_sparkle"
+                    android:background="@drawable/bg_circle_white"
+                    android:padding="8dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:layout_marginStart="12dp">
+
+                    <!-- 歌单标题 -->
+                    <TextView
+                        android:id="@+id/tvPlaylistName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="AI推荐歌单"
+                        android:textSize="18sp"
+                        android:textColor="@android:color/white"
+                        android:textStyle="bold"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <!-- 时间标签 -->
+                    <TextView
+                        android:id="@+id/tvTimestamp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="刚刚"
+                        android:textSize="12sp"
+                        android:textColor="@android:color/white"
+                        android:alpha="0.8"
+                        android:layout_marginTop="2dp" />
+
+                </LinearLayout>
+
+                <!-- 播放按钮 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnPlayAll"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    app:cornerRadius="24dp"
+                    android:backgroundTint="@android:color/white"
+                    app:icon="@drawable/ic_play"
+                    app:iconTint="@color/primary"
+                    app:iconGravity="textStart"
+                    app:iconPadding="0dp" />
+
+            </LinearLayout>
+
+        </FrameLayout>
+
+        <!-- 推荐说明 -->
+        <TextView
+            android:id="@+id/tvExplanation"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="根据你的喜好推荐"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:lineSpacingMultiplier="1.3"
+            android:padding="16dp" />
+
+        <!-- 歌曲列表预览 -->
+        <LinearLayout
+            android:id="@+id/songsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="16dp" />
+
+        <!-- 底部操作栏 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="12dp"
+            android:background="@color/background">
+
+            <TextView
+                android:id="@+id/tvSongCount"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="共 10 首歌曲"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary" />
+
+            <ImageButton
+                android:id="@+id/btnShare"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_share"
+                android:tint="@color/text_secondary" />
+
+            <ImageButton
+                android:id="@+id/btnDelete"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_delete"
+                android:tint="@color/text_secondary" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

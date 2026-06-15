@@ -39,6 +39,9 @@ class LibraryFragment : Fragment() {
         view.findViewById<MaterialCardView?>(R.id.cardHistory)?.setOnClickListener {
             startActivity(Intent(requireContext(), HistoryActivity::class.java))
         }
+        view.findViewById<MaterialCardView?>(R.id.cardAIRecommendation)?.setOnClickListener {
+            startActivity(Intent(requireContext(), AIRecommendationActivity::class.java))
+        }
         view.findViewById<MaterialCardView?>(R.id.cardImport)?.setOnClickListener {
             startActivity(Intent(requireContext(), PlaylistImportActivity::class.java))
         }
