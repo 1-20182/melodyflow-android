@@ -40,7 +40,9 @@ class LibraryFragment : Fragment() {
             startActivity(Intent(requireContext(), HistoryActivity::class.java))
         }
         view.findViewById<MaterialCardView?>(R.id.cardAIRecommendation)?.setOnClickListener {
-            startActivity(Intent(requireContext(), AIRecommendationActivity::class.java))
+            startActivity(Intent(requireContext(), MainActivity::class.java).apply {
+                putExtra("nav_to", "ai")
+            })
         }
         view.findViewById<MaterialCardView?>(R.id.cardImport)?.setOnClickListener {
             startActivity(Intent(requireContext(), PlaylistImportActivity::class.java))

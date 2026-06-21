@@ -59,7 +59,8 @@ data class AIRecommendedSong(
     val songName: String,
     val artist: String,
     val album: String? = null,
-    val reason: String? = null
+    val reason: String? = null,
+    val coverUrl: String? = null
 ) : Parcelable
 
 /**

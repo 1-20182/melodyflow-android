@@ -17,6 +17,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -27,14 +28,18 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.LinearSmoothScroller
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.slider.Slider
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.melodyflow.app.MelodyFlowApp
@@ -45,8 +50,11 @@ import com.melodyflow.app.model.Song
 import com.melodyflow.app.model.SongListHolder
 import com.melodyflow.app.service.MusicService
 import com.melodyflow.app.util.BackgroundManager
+import com.melodyflow.app.util.Logger
 import com.melodyflow.app.util.LyricParser
+import com.melodyflow.app.util.LyricsCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +63,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var btnClose: ImageButton
     private lateinit var btnFavorite: ImageButton
+    private lateinit var btnLyrics: ImageButton
     private var btnMore: ImageButton? = null
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
@@ -116,6 +125,13 @@ class PlayerActivity : AppCompatActivity() {
     private var rotationAnimator: ValueAnimator? = null
     private var isPlaying = false
 
+    private lateinit var gestureDetector: android.view.GestureDetector
+
+    // Swipe gesture debounce
+    private var lastSwipeTime = 0L
+    private val swipeCooldownMs = 300L
+    private var isLyricsTransitioning = false
+
     private val repository by lazy {
         (application as MelodyFlowApp).repository
     }
@@ -128,17 +144,17 @@ class PlayerActivity : AppCompatActivity() {
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             // #region debug-point service-connected
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] onServiceConnected START")
+            Logger.d("PlayerActivity", "[player-cover-landscape-bug] onServiceConnected START")
             // #endregion
             musicService = (binder as? MusicService.LocalBinder)?.getService()
             serviceBound = true
             musicService?.addPlaybackListener(playbackListener)
             // #region debug-point before-initPlayer
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] Calling initPlayer from onServiceConnected")
+            Logger.d("PlayerActivity", "[player-cover-landscape-bug] Calling initPlayer from onServiceConnected")
             // #endregion
             initPlayer()
             // #region debug-point after-initPlayer
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initPlayer completed")
+            Logger.d("PlayerActivity", "[player-cover-landscape-bug] initPlayer completed")
             // #endregion
         }
 
@@ -151,7 +167,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private val playbackListener = object : MusicService.PlaybackListener {
         override fun onSongChanged(song: Song?) {
-            android.util.Log.d("PlayerActivity", "onSongChanged: song=${song?.name}")
+            Logger.d("PlayerActivity", "onSongChanged: song=${song?.name}")
             song?.let {
                 currentSong = it
                 retainedSong = it
@@ -205,32 +221,20 @@ class PlayerActivity : AppCompatActivity() {
                     updatePlayButtonState(service.isPlaying())
                 } catch (e: Exception) {
                     // Player not ready yet, skip this update
-                    android.util.Log.d("PlayerActivity", "Progress update skipped: player not ready")
+                    Logger.d("PlayerActivity", "Progress update skipped: player not ready")
                 }
             }
-            handler.postDelayed(this, 500)
+            handler.postDelayed(this, 50)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // #region debug-point onCreate-start
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] onCreate START, savedInstanceState=$savedInstanceState, retainedSong=$retainedSong")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] onCreate START, savedInstanceState=$savedInstanceState, retainedSong=$retainedSong")
         // #endregion
         try {
-            setContentView(R.layout.activity_player)
-            // #region debug-point setContentView-done
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] setContentView done, orientation=${resources.configuration.orientation}")
-            // #endregion
-
-            BackgroundManager.applyToActivity(this)
-
-            initViews()
-            // #region debug-point initViews-done
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initViews done, ivCover initialized=${::ivCover.isInitialized}, coverContainer initialized=${::coverContainer.isInitialized}")
-            // #endregion
-            setupLyricsFocusAdapter()
-            setupListeners()
+            setupPlayerUI()
 
             currentSong = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra("song", Song::class.java)
@@ -240,14 +244,14 @@ class PlayerActivity : AppCompatActivity() {
             }
             clickIndexExtra = intent.getIntExtra("clickIndex", -1)
             // #region debug-point song-received
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] Song from intent: $currentSong, clickIndex=$clickIndexExtra")
+            Logger.d("PlayerActivity", "[player-cover-landscape-bug] Song from intent: $currentSong, clickIndex=$clickIndexExtra")
             // #endregion
 
             if (currentSong != null) {
                 retainedSong = currentSong
                 // Update cover directly (no Fragment needed)
                 // #region debug-point updateCoverView-call
-                android.util.Log.d("DEBUG", "[player-cover-landscape-bug] Calling updateCoverView from onCreate, song.pic=${currentSong!!.pic}")
+                Logger.d("PlayerActivity", "[player-cover-landscape-bug] Calling updateCoverView from onCreate, song.pic=${currentSong!!.pic}")
                 // #endregion
                 updateCoverView(currentSong!!)
                 loadLyrics(currentSong!!)
@@ -262,7 +266,7 @@ class PlayerActivity : AppCompatActivity() {
             startService(serviceIntent)
         } catch (e: Exception) {
             // #region debug-point onCreate-error
-            android.util.Log.e("DEBUG", "[player-cover-landscape-bug] onCreate ERROR: ${e.message}", e)
+            Logger.e("PlayerActivity", "[player-cover-landscape-bug] onCreate ERROR: ${e.message}", e)
             // #endregion
             e.printStackTrace()
             Toast.makeText(this, "播放器初始化失败: ${e.message}", Toast.LENGTH_LONG).show()
@@ -280,21 +284,69 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupPlayerUI() {
+        setContentView(R.layout.activity_player)
+        // #region debug-point setContentView-done
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] setContentView done, orientation=${resources.configuration.orientation}")
+        // #endregion
+
+        BackgroundManager.applyToActivity(this)
+
+        initViews()
+        // #region debug-point initViews-done
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] initViews done, ivCover initialized=${::ivCover.isInitialized}, coverContainer initialized=${::coverContainer.isInitialized}")
+        // #endregion
+        setupLyricsFocusAdapter()
+        setupListeners()
+        setupSwipeGestures()
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         // #region debug-point config-changed
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] onConfigurationChanged, newOrientation=${newConfig.orientation}, retainedSong=$retainedSong")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] onConfigurationChanged, newOrientation=${newConfig.orientation}, retainedSong=$retainedSong")
         // #endregion
+
+        // 保存当前歌词模式状态，切换布局后恢复
+        val wasLyricsFocusMode = isLyricsFocusMode
         if (isLyricsFocusMode) {
             collapseLyricsFocus()
         }
+
+        // 重新加载对应方向的布局
+        setupPlayerUI()
+
+        // 恢复界面状态
         retainedSong?.let { song ->
             // #region debug-point updateCoverView-config
-            android.util.Log.d("DEBUG", "[player-cover-landscape-bug] Calling updateCoverView from onConfigurationChanged, song.pic=${song.pic}")
+            Logger.d("PlayerActivity", "[player-cover-landscape-bug] Calling updateCoverView from onConfigurationChanged, song.pic=${song.pic}")
             // #endregion
             updateCoverView(song)
+            // 优先使用已加载的歌词恢复界面，避免异步加载导致歌词模式恢复失败
+            if (lyricsList.isNotEmpty()) {
+                lyricsFocusAdapter.setLyrics(lyricsList)
+                tvNoLyricsPreview?.visibility = View.GONE
+                rvLyricsPreview?.visibility = View.VISIBLE
+            } else {
+                loadLyrics(song)
+            }
         }
         updatePlayButtonState(retainedIsPlaying)
+        musicService?.let { service ->
+            updatePlayModeIcon(service.getPlayMode())
+            updateCoverAnimation(service.isPlaying())
+        }
+        retainedSong?.let { song ->
+            lifecycleScope.launch {
+                val isFav = repository.isFavorite(song.id).first()
+                updateFavoriteIcon(isFav)
+            }
+        }
+
+        // 如果之前在歌词模式且歌词已加载，恢复歌词界面
+        if (wasLyricsFocusMode && lyricsList.isNotEmpty()) {
+            expandLyricsFocus()
+        }
     }
 
     override fun onDestroy() {
@@ -322,11 +374,12 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun initViews() {
         // #region debug-point initViews-start
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initViews START")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] initViews START")
         // #endregion
         
         btnClose = findViewById(R.id.btnClose)
         btnFavorite = findViewById(R.id.btnFavorite)
+        btnLyrics = findViewById(R.id.btnLyrics)
         btnMore = findViewById(R.id.btnMore)
         tvCurrentTime = findViewById(R.id.tvCurrentTime)
         tvTotalTime = findViewById(R.id.tvTotalTime)
@@ -357,7 +410,7 @@ class PlayerActivity : AppCompatActivity() {
 
         // #region debug-point initViews-cover
         val ivCoverParent = ivCover.parent
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initViews cover views: coverContainer=$coverContainer, coverCard=$coverCard, ivCover=$ivCover, ivCover.id=${ivCover.id}, ivCover.parent=$ivCoverParent")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] initViews cover views: coverContainer=$coverContainer, coverCard=$coverCard, ivCover=$ivCover, ivCover.id=${ivCover.id}, ivCover.parent=$ivCoverParent")
         // #endregion
         
         // Lyrics preview views (landscape mode)
@@ -372,17 +425,11 @@ class PlayerActivity : AppCompatActivity() {
         tvNoLyricsFocus = findViewById(R.id.tvNoLyricsFocus)
 
         // #region debug-point initViews-done
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initViews DONE, all views initialized")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] initViews DONE, all views initialized")
         // #endregion
 
         // Setup cover rotation animation
         setupCoverAnimation()
-        
-        // Setup cover click listener - 点击封面进入歌词界面
-        coverContainer.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "coverContainer clicked")
-            expandLyricsFocus()
-        }
 
         // 封面长按显示播放按钮
         coverContainer.setOnLongClickListener {
@@ -462,7 +509,7 @@ class PlayerActivity : AppCompatActivity() {
         // Load cover image - use getCoverUrl() which returns pic field if it's HTTP URL
         val coverUrl = song.getCoverUrl()
         
-        android.util.Log.d("PlayerActivity", "updateCoverView: song=${song.name}, pic=${song.pic}, coverUrl=$coverUrl")
+        Logger.d("PlayerActivity", "updateCoverView: song=${song.name}, pic=${song.pic}, coverUrl=$coverUrl")
 
         // Clear previous image first
         Glide.with(this).clear(ivCover)
@@ -475,7 +522,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         if (coverUrl.isBlank()) {
-            android.util.Log.w("PlayerActivity", "Cover URL is blank, using placeholder")
+            Logger.w("PlayerActivity", "Cover URL is blank, using placeholder")
             ivCover.setImageResource(R.drawable.ic_music_note)
             return
         }
@@ -494,7 +541,7 @@ class PlayerActivity : AppCompatActivity() {
                         target: com.bumptech.glide.request.target.Target<android.graphics.drawable.Drawable>,
                         isFirstResource: Boolean
                     ): Boolean {
-                        android.util.Log.e("PlayerActivity", "Glide load failed: model=$model, error=${e?.message}")
+                        Logger.e("PlayerActivity", "Glide load failed: model=$model, error=${e?.message}")
                         return false
                     }
 
@@ -505,7 +552,7 @@ class PlayerActivity : AppCompatActivity() {
                         dataSource: com.bumptech.glide.load.DataSource,
                         isFirstResource: Boolean
                     ): Boolean {
-                        android.util.Log.d("PlayerActivity", "Glide load success: model=$model, resource=$resource")
+                        Logger.d("PlayerActivity", "Glide load success: model=$model, resource=$resource")
                         return false
                     }
                 })
@@ -522,7 +569,7 @@ class PlayerActivity : AppCompatActivity() {
                     .into(bgImage)
             }
         } catch (e: Exception) {
-            android.util.Log.e("PlayerActivity", "Error loading cover: ${e.message}", e)
+            Logger.e("PlayerActivity", "Error loading cover: ${e.message}", e)
             ivCover.setImageResource(R.drawable.ic_music_note)
         }
     }
@@ -604,31 +651,77 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         btnPlaylist.setOnClickListener {
-            showPlaylistDialog()
+            showPlaylistPage()
         }
 
         btnCloseLyrics.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btnCloseLyrics clicked")
+            Logger.d("PlayerActivity", "btnCloseLyrics clicked")
             collapseLyricsFocus()
         }
 
-        // 移除了 lyricsFocusOverlay 的点击事件，避免误触关闭
-        // 现在只能通过关闭按钮关闭歌词界面
-
-        // 歌词预览区域点击事件已移除，改为点击封面进入歌词界面
+        // 歌词界面通过左右滑动手势进入/退出
+        // 保留关闭按钮作为辅助退出方式
 
         // Setup progress bar listeners
         setupProgressBarListeners()
     }
 
-    private fun expandLyricsFocus() {
-        android.util.Log.d("PlayerActivity", "expandLyricsFocus: lyricsList.isEmpty=${lyricsList.isEmpty()}, isLyricsFocusMode=$isLyricsFocusMode")
-        if (lyricsList.isEmpty() || isLyricsFocusMode) return
+    private fun setupSwipeGestures() {
+        gestureDetector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
+            private val swipeThreshold = 100
+            private val swipeVelocityThreshold = 100
 
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+                // Debounce: ignore rapid repeated swipes
+                val now = System.currentTimeMillis()
+                if (now - lastSwipeTime < swipeCooldownMs) return false
+                // Prevent swipe during transition animation
+                if (isLyricsTransitioning) return false
+                val diffX: Float = e2.x - e1.x
+                val diffY: Float = e2.y - e1.y
+                if (kotlin.math.abs(diffX) > kotlin.math.abs(diffY)) {
+                    if (kotlin.math.abs(diffX) > swipeThreshold && kotlin.math.abs(velocityX) > swipeVelocityThreshold) {
+                        lastSwipeTime = now
+                        if (diffX < 0) {
+                            // 从右向左滑：进入歌词页
+                            if (!isLyricsFocusMode) {
+                                expandLyricsFocus()
+                            }
+                        } else {
+                            // 从左向右滑：退出歌词页
+                            if (isLyricsFocusMode) {
+                                collapseLyricsFocus()
+                            }
+                        }
+                        return true
+                    }
+                }
+                return false
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev != null) {
+            gestureDetector.onTouchEvent(ev)
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun expandLyricsFocus() {
+        Logger.d("PlayerActivity", "expandLyricsFocus: lyricsList.isEmpty=${lyricsList.isEmpty()}, isLyricsFocusMode=$isLyricsFocusMode")
+        if (lyricsList.isEmpty() || isLyricsFocusMode || isLyricsTransitioning) return
+
+        isLyricsTransitioning = true
         isLyricsFocusMode = true
-        android.util.Log.d("PlayerActivity", "expandLyricsFocus: entering lyrics mode")
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val duration = if (isLandscape) 300L else 250L
+        Logger.d("PlayerActivity", "expandLyricsFocus: entering lyrics mode")
+        val duration = 180L
 
         lyricsFocusAdapter.setLyrics(lyricsList)
         lyricsFocusAdapter.setCurrentIndex(currentLyricIndex)
@@ -639,6 +732,11 @@ class PlayerActivity : AppCompatActivity() {
             .alpha(1f)
             .setDuration(duration)
             .setInterpolator(DecelerateInterpolator())
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    isLyricsTransitioning = false
+                }
+            })
             .start()
 
         btnCloseLyrics.visibility = View.VISIBLE
@@ -649,24 +747,16 @@ class PlayerActivity : AppCompatActivity() {
             .setInterpolator(DecelerateInterpolator())
             .start()
 
-        cardContainer?.animate()
-            ?.scaleX(1.08f)
-            ?.scaleY(1.08f)
-            ?.translationZ(16f)
-            ?.setDuration(duration)
-            ?.setInterpolator(DecelerateInterpolator())
-            ?.start()
-
 
     }
 
     private fun collapseLyricsFocus() {
-        android.util.Log.d("PlayerActivity", "collapseLyricsFocus: isLyricsFocusMode=$isLyricsFocusMode")
-        if (!isLyricsFocusMode) return
+        Logger.d("PlayerActivity", "collapseLyricsFocus: isLyricsFocusMode=$isLyricsFocusMode")
+        if (!isLyricsFocusMode || isLyricsTransitioning) return
+        isLyricsTransitioning = true
         isLyricsFocusMode = false
-        android.util.Log.d("PlayerActivity", "collapseLyricsFocus: exiting lyrics mode")
-        val isLandscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val duration = if (isLandscape) 250L else 200L
+        Logger.d("PlayerActivity", "collapseLyricsFocus: exiting lyrics mode")
+        val duration = 150L
 
         btnCloseLyrics.animate()
             .alpha(0f)
@@ -686,17 +776,10 @@ class PlayerActivity : AppCompatActivity() {
             .setListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     lyricsFocusOverlay.visibility = View.GONE
+                    isLyricsTransitioning = false
                 }
             })
             .start()
-
-        cardContainer?.animate()
-            ?.scaleX(1f)
-            ?.scaleY(1f)
-            ?.translationZ(0f)
-            ?.setDuration(duration)
-            ?.setInterpolator(AccelerateDecelerateInterpolator())
-            ?.start()
     }
 
     private fun updateLyricsFocusPosition(position: Int) {
@@ -707,27 +790,50 @@ class PlayerActivity : AppCompatActivity() {
             currentLyricIndex = newIndex
             lyricsFocusAdapter.setCurrentIndex(newIndex)
 
-            // Scroll fullscreen lyrics if in focus mode
+            // Scroll fullscreen lyrics if in focus mode, centered
             if (isLyricsFocusMode) {
-                val layoutManager = rvLyricsFocus.layoutManager as? LinearLayoutManager
-                layoutManager?.scrollToPositionWithOffset(newIndex, rvLyricsFocus.height / 3)
+                smoothScrollToCenter(rvLyricsFocus, newIndex)
             }
 
-            // Also scroll preview lyrics (landscape mode)
+            // Also scroll preview lyrics (landscape mode), centered
             rvLyricsPreview?.let { previewRv ->
-                val previewLayoutManager = previewRv.layoutManager as? LinearLayoutManager
-                previewLayoutManager?.scrollToPositionWithOffset(newIndex, previewRv.height / 3)
+                smoothScrollToCenter(previewRv, newIndex)
             }
         }
     }
 
-    private fun findLyricIndexByPosition(position: Int): Int {
-        for (i in lyricsList.indices) {
-            if (lyricsList[i].time > position) {
-                return maxOf(0, i - 1)
+    private fun smoothScrollToCenter(recyclerView: RecyclerView, position: Int) {
+        val smoothScroller = object : LinearSmoothScroller(recyclerView.context) {
+            override fun calculateDtToFit(
+                viewStart: Int,
+                viewEnd: Int,
+                boxStart: Int,
+                boxEnd: Int,
+                snapPreference: Int
+            ): Int {
+                // Center the item in the RecyclerView
+                return (boxStart + (boxEnd - boxStart) / 2) - (viewStart + (viewEnd - viewStart) / 2)
             }
         }
-        return lyricsList.size - 1
+        smoothScroller.targetPosition = position
+        recyclerView.layoutManager?.startSmoothScroll(smoothScroller)
+    }
+
+    private fun findLyricIndexByPosition(position: Int): Int {
+        if (lyricsList.isEmpty()) return -1
+        // Binary search: find the first index where time > position,
+        // then return the previous index (the current lyric line)
+        var left = 0
+        var right = lyricsList.size
+        while (left < right) {
+            val mid = (left + right) / 2
+            if (lyricsList[mid].time <= position) {
+                left = mid + 1
+            } else {
+                right = mid
+            }
+        }
+        return maxOf(0, left - 1)
     }
 
     private fun animateControlButton(button: View) {
@@ -787,51 +893,79 @@ class PlayerActivity : AppCompatActivity() {
     private fun loadLyrics(song: Song) {
         lifecycleScope.launch {
             try {
-                val lrcText = withContext(Dispatchers.IO) { repository.getLyrics(song.id) }
+                // Check cache first
+                val cached = LyricsCache.get(song.id)
+                if (cached != null) {
+                    lyricsList = cached
+                    applyLyricsToUI(cached)
+                    return@launch
+                }
+
+                // Load from network with retry
+                val lrcText = loadLyricsWithRetry(song.id)
                 if (!lrcText.isNullOrBlank()) {
                     val parsed = LyricParser.parse(lrcText)
                     if (parsed.isNotEmpty()) {
                         lyricsList = parsed
-                        lyricsFocusAdapter.setLyrics(parsed)
-                        // Update fullscreen lyrics visibility
-                        tvNoLyricsFocus.visibility = View.GONE
-                        rvLyricsFocus.visibility = View.VISIBLE
-                        // Update preview lyrics visibility (landscape mode)
-                        tvNoLyricsPreview?.visibility = View.GONE
-                        rvLyricsPreview?.visibility = View.VISIBLE
-                        if (isLyricsFocusMode) {
-                            lyricsFocusAdapter.notifyDataSetChanged()
-                        }
+                        LyricsCache.put(song.id, parsed)
+                        applyLyricsToUI(parsed)
                         return@launch
                     }
                 }
                 lyricsList = emptyList()
-                // Show "no lyrics" in fullscreen
-                tvNoLyricsFocus.visibility = View.VISIBLE
-                tvNoLyricsFocus.text = "暂无歌词"
-                rvLyricsFocus.visibility = View.GONE
-                // Show "no lyrics" in preview (landscape mode)
-                tvNoLyricsPreview?.visibility = View.VISIBLE
-                tvNoLyricsPreview?.text = "暂无歌词"
-                rvLyricsPreview?.visibility = View.GONE
+                showNoLyrics()
             } catch (e: Exception) {
-                android.util.Log.e("PlayerActivity", "Failed to load lyrics for ${song.id}", e)
+                Logger.e("PlayerActivity", "Failed to load lyrics for ${song.id}", e)
                 lyricsList = emptyList()
-                // Show error in fullscreen
-                tvNoLyricsFocus.visibility = View.VISIBLE
-                tvNoLyricsFocus.text = "歌词加载失败"
-                rvLyricsFocus.visibility = View.GONE
-                // Show error in preview (landscape mode)
-                tvNoLyricsPreview?.visibility = View.VISIBLE
-                tvNoLyricsPreview?.text = "歌词加载失败"
-                rvLyricsPreview?.visibility = View.GONE
+                showNoLyrics()
             }
         }
     }
 
+    private suspend fun loadLyricsWithRetry(songId: String, maxRetries: Int = 3): String? {
+        var lastException: Exception? = null
+        for (attempt in 1..maxRetries) {
+            try {
+                val result = withContext(Dispatchers.IO) { repository.getLyrics(songId) }
+                if (!result.isNullOrBlank()) return result
+                Logger.d("PlayerActivity", "loadLyrics attempt $attempt: empty result for $songId")
+            } catch (e: Exception) {
+                lastException = e
+                Logger.w("PlayerActivity", "loadLyrics attempt $attempt failed for $songId: ${e.message}")
+                if (attempt < maxRetries) {
+                    delay(1000L * attempt) // Exponential backoff: 1s, 2s, 3s
+                }
+            }
+        }
+        if (lastException != null) {
+            Logger.e("PlayerActivity", "loadLyrics all $maxRetries retries failed for $songId", lastException)
+        }
+        return null
+    }
+
+    private fun applyLyricsToUI(parsed: List<LyricLine>) {
+        lyricsFocusAdapter.setLyrics(parsed)
+        tvNoLyricsFocus.visibility = View.GONE
+        rvLyricsFocus.visibility = View.VISIBLE
+        tvNoLyricsPreview?.visibility = View.GONE
+        rvLyricsPreview?.visibility = View.VISIBLE
+        if (isLyricsFocusMode) {
+            lyricsFocusAdapter.notifyDataSetChanged()
+        }
+    }
+
+    private fun showNoLyrics() {
+        tvNoLyricsFocus.visibility = View.VISIBLE
+        tvNoLyricsFocus.text = "歌词加载失败"
+        rvLyricsFocus.visibility = View.GONE
+        tvNoLyricsPreview?.visibility = View.VISIBLE
+        tvNoLyricsPreview?.text = "歌词加载失败"
+        rvLyricsPreview?.visibility = View.GONE
+    }
+
     private fun initPlayer() {
         // #region debug-point initPlayer-start
-        android.util.Log.d("DEBUG", "[player-cover-landscape-bug] initPlayer START, musicService=$musicService, currentSong=$currentSong, retainedSong=$retainedSong")
+        Logger.d("PlayerActivity", "[player-cover-landscape-bug] initPlayer START, musicService=$musicService, currentSong=$currentSong, retainedSong=$retainedSong")
         // #endregion
         musicService?.let { service ->
             val autoPlay = intent.getBooleanExtra("autoPlay", false)
@@ -857,7 +991,7 @@ class PlayerActivity : AppCompatActivity() {
 
             // Use currentSong from intent if available, otherwise use service's current song
             val songToDisplay = currentSong ?: service.getCurrentSong()
-            android.util.Log.d("PlayerActivity", "initPlayer: currentSong=$currentSong, serviceSong=${service.getCurrentSong()}, songToDisplay=$songToDisplay")
+            Logger.d("PlayerActivity", "initPlayer: currentSong=$currentSong, serviceSong=${service.getCurrentSong()}, songToDisplay=$songToDisplay")
             if (songToDisplay != null) {
                 updateCoverView(songToDisplay)
                 loadLyrics(songToDisplay)
@@ -874,12 +1008,13 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showMoreDialog() {
-        android.util.Log.d("PlayerActivity", "showMoreDialog: START")
+        Logger.d("PlayerActivity", "showMoreDialog: START")
         val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.dialog_sleep_timer, null)
+        val view = layoutInflater.inflate(R.layout.dialog_player_more, null)
         dialog.setContentView(view)
-        android.util.Log.d("PlayerActivity", "showMoreDialog: dialog content set")
+        Logger.d("PlayerActivity", "showMoreDialog: dialog content set")
 
+        // --- 定时关闭相关控件 ---
         val tvCurrentTimer = view.findViewById<TextView>(R.id.tvCurrentTimer)
         val btn15Min = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn15Min)
         val btn30Min = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btn30Min)
@@ -915,61 +1050,98 @@ class PlayerActivity : AppCompatActivity() {
             btnCancelTimer.visibility = View.GONE
         }
 
-        // 按歌曲剩余时长 - 播放完当前歌曲
+        // 定时关闭 - 按歌曲剩余时长
         btnEndOfSong.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btnEndOfSong clicked")
+            Logger.d("PlayerActivity", "btnEndOfSong clicked")
             setSleepTimerEndOfSong()
             dialog.dismiss()
             Toast.makeText(this, "将在当前歌曲播放完毕后关闭", Toast.LENGTH_SHORT).show()
         }
 
-        // 按歌曲剩余时长 - 再播1首
         btnAfter1Song.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btnAfter1Song clicked")
+            Logger.d("PlayerActivity", "btnAfter1Song clicked")
             setSleepTimerAfterSongs(1)
             dialog.dismiss()
             Toast.makeText(this, "将在播放完下1首歌曲后关闭", Toast.LENGTH_SHORT).show()
         }
 
-        // 按歌曲剩余时长 - 再播2首
         btnAfter2Songs.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btnAfter2Songs clicked")
+            Logger.d("PlayerActivity", "btnAfter2Songs clicked")
             setSleepTimerAfterSongs(2)
             dialog.dismiss()
             Toast.makeText(this, "将在播放完下2首歌曲后关闭", Toast.LENGTH_SHORT).show()
         }
 
-        // 按固定时长
+        // 定时关闭 - 按固定时长
         btn15Min.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btn15Min clicked")
+            Logger.d("PlayerActivity", "btn15Min clicked")
             setSleepTimer(15)
             dialog.dismiss()
             Toast.makeText(this, "已设置 15 分钟后关闭", Toast.LENGTH_SHORT).show()
         }
 
         btn30Min.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btn30Min clicked")
+            Logger.d("PlayerActivity", "btn30Min clicked")
             setSleepTimer(30)
             dialog.dismiss()
             Toast.makeText(this, "已设置 30 分钟后关闭", Toast.LENGTH_SHORT).show()
         }
 
         btn60Min.setOnClickListener {
-            android.util.Log.d("PlayerActivity", "btn60Min clicked")
+            Logger.d("PlayerActivity", "btn60Min clicked")
             setSleepTimer(60)
             dialog.dismiss()
             Toast.makeText(this, "已设置 60 分钟后关闭", Toast.LENGTH_SHORT).show()
         }
 
-        // Cancel timer
+        // 取消定时
         btnCancelTimer.setOnClickListener {
             cancelSleepTimer()
             dialog.dismiss()
             Toast.makeText(this, "已取消定时关闭", Toast.LENGTH_SHORT).show()
         }
 
-        // Close dialog
+        // 关闭对话框
         btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        // --- 倍速播放相关控件 ---
+        val chipGroupSpeed = view.findViewById<ChipGroup>(R.id.chipGroupSpeed)
+        // 根据当前速度选中对应的 Chip
+        val currentSpeed = musicService?.getSpeed() ?: 1.0f
+        val speedChipId = when {
+            currentSpeed <= 0.5f -> R.id.chipSpeed0_5
+            currentSpeed <= 0.75f -> R.id.chipSpeed0_75
+            currentSpeed <= 1.0f -> R.id.chipSpeed1_0
+            currentSpeed <= 1.25f -> R.id.chipSpeed1_25
+            currentSpeed <= 1.5f -> R.id.chipSpeed1_5
+            else -> R.id.chipSpeed2_0
+        }
+        chipGroupSpeed.check(speedChipId)
+
+        chipGroupSpeed.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isEmpty()) return@setOnCheckedStateChangeListener
+            val checkedId = checkedIds[0]
+            val speed = when (checkedId) {
+                R.id.chipSpeed0_5 -> 0.5f
+                R.id.chipSpeed0_75 -> 0.75f
+                R.id.chipSpeed1_0 -> 1.0f
+                R.id.chipSpeed1_25 -> 1.25f
+                R.id.chipSpeed1_5 -> 1.5f
+                R.id.chipSpeed2_0 -> 2.0f
+                else -> 1.0f
+            }
+            musicService?.setSpeed(speed)
+            val chip = view.findViewById<Chip>(checkedId)
+            Toast.makeText(this, "倍速: ${chip.text}", Toast.LENGTH_SHORT).show()
+        }
+
+        // --- 均衡器入口 ---
+        val btnEqualizer = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnEqualizer)
+        btnEqualizer.setOnClickListener {
+            val audioSessionId = musicService?.getAudioSessionId() ?: 0
+            EqualizerActivity.start(this, audioSessionId)
             dialog.dismiss()
         }
 
@@ -977,7 +1149,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setSleepTimer(minutes: Int) {
-        android.util.Log.d("PlayerActivity", "setSleepTimer: minutes=$minutes")
+        Logger.d("PlayerActivity", "setSleepTimer: minutes=$minutes")
         cancelSleepTimer()
 
         sleepTimerMode = SleepTimerMode.FIXED_TIME
@@ -986,16 +1158,16 @@ class PlayerActivity : AppCompatActivity() {
         isSleepTimerActive = true
 
         sleepTimerRunnable = Runnable {
-            android.util.Log.d("PlayerActivity", "sleepTimerRunnable: timer triggered!")
+            Logger.d("PlayerActivity", "sleepTimerRunnable: timer triggered!")
             stopMusicAndClose()
         }
 
         sleepTimerHandler?.postDelayed(sleepTimerRunnable!!, minutes * 60 * 1000L)
-        android.util.Log.d("PlayerActivity", "setSleepTimer: timer scheduled for $minutes minutes")
+        Logger.d("PlayerActivity", "setSleepTimer: timer scheduled for $minutes minutes")
     }
 
     private fun setSleepTimerEndOfSong() {
-        android.util.Log.d("PlayerActivity", "setSleepTimerEndOfSong")
+        Logger.d("PlayerActivity", "setSleepTimerEndOfSong")
         cancelSleepTimer()
         sleepTimerMode = SleepTimerMode.END_OF_SONG
         isSleepTimerActive = true
@@ -1003,7 +1175,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setSleepTimerAfterSongs(songCount: Int) {
-        android.util.Log.d("PlayerActivity", "setSleepTimerAfterSongs: songCount=$songCount")
+        Logger.d("PlayerActivity", "setSleepTimerAfterSongs: songCount=$songCount")
         cancelSleepTimer()
         sleepTimerMode = SleepTimerMode.AFTER_SONGS
         isSleepTimerActive = true
@@ -1011,7 +1183,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun cancelSleepTimer() {
-        android.util.Log.d("PlayerActivity", "cancelSleepTimer")
+        Logger.d("PlayerActivity", "cancelSleepTimer")
         sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
         sleepTimerHandler = null
         sleepTimerRunnable = null
@@ -1022,7 +1194,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun stopMusicAndClose() {
-        android.util.Log.d("PlayerActivity", "stopMusicAndClose: stopping music and closing activity")
+        Logger.d("PlayerActivity", "stopMusicAndClose: stopping music and closing activity")
         val intent = Intent(this, MusicService::class.java).apply {
             action = MusicService.ACTION_STOP
         }
@@ -1031,17 +1203,17 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     fun onSongCompleted() {
-        android.util.Log.d("PlayerActivity", "onSongCompleted: sleepTimerMode=$sleepTimerMode, remainingSongsCount=$remainingSongsCount")
+        Logger.d("PlayerActivity", "onSongCompleted: sleepTimerMode=$sleepTimerMode, remainingSongsCount=$remainingSongsCount")
         if (!isSleepTimerActive) return
 
         when (sleepTimerMode) {
             SleepTimerMode.END_OF_SONG -> {
-                android.util.Log.d("PlayerActivity", "onSongCompleted: END_OF_SONG mode, stopping")
+                Logger.d("PlayerActivity", "onSongCompleted: END_OF_SONG mode, stopping")
                 stopMusicAndClose()
             }
             SleepTimerMode.AFTER_SONGS -> {
                 remainingSongsCount--
-                android.util.Log.d("PlayerActivity", "onSongCompleted: AFTER_SONGS mode, remaining=$remainingSongsCount")
+                Logger.d("PlayerActivity", "onSongCompleted: AFTER_SONGS mode, remaining=$remainingSongsCount")
                 if (remainingSongsCount <= 0) {
                     stopMusicAndClose()
                 }
@@ -1052,39 +1224,8 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    private fun showPlaylistDialog() {
-        val playlist = musicService?.getPlaylist() ?: emptyList()
-        if (playlist.isEmpty()) {
-            Toast.makeText(this, "播放列表为空", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val dialog = BottomSheetDialog(this)
-        val view = layoutInflater.inflate(R.layout.dialog_playlist, null)
-        dialog.setContentView(view)
-
-        val rvPlaylist = view.findViewById<RecyclerView>(R.id.rvPlaylist)
-        val tvTitle = view.findViewById<TextView>(R.id.tvTitle)
-        val btnClose = view.findViewById<ImageButton>(R.id.btnClose)
-
-        tvTitle.text = "播放列表 (${playlist.size})"
-
-        val currentSongId = musicService?.getCurrentSong()?.id
-        val adapter = com.melodyflow.app.adapter.PlaylistAdapter(currentSongId) { song ->
-            musicService?.playSong(song)
-            dialog.dismiss()
-        }
-        adapter.submitList(playlist)
-
-        rvPlaylist.layoutManager = LinearLayoutManager(this)
-        rvPlaylist.adapter = adapter
-        rvPlaylist.itemAnimator = androidx.recyclerview.widget.DefaultItemAnimator()
-
-        btnClose.setOnClickListener {
-            dialog.dismiss()
-        }
-
-        dialog.show()
+    private fun showPlaylistPage() {
+        PlaylistActivity.start(this)
     }
 
     private fun formatTime(milliseconds: Int): String {
@@ -1135,6 +1276,14 @@ class LyricsFocusAdapter : RecyclerView.Adapter<LyricsFocusAdapter.LyricViewHold
     private var lyrics = listOf<LyricLine>()
     private var currentIndex = -1
 
+    companion object {
+        private const val ACTIVE_SIZE = 20f
+        private const val NEXT_SIZE = 15f
+        private const val INACTIVE_SIZE = 13f
+        private const val ACTIVE_ALPHA = 0.85f
+        private const val INACTIVE_ALPHA = 0.35f
+    }
+
     fun setLyrics(newLyrics: List<LyricLine>) {
         lyrics = newLyrics
         notifyDataSetChanged()
@@ -1143,8 +1292,16 @@ class LyricsFocusAdapter : RecyclerView.Adapter<LyricsFocusAdapter.LyricViewHold
     fun setCurrentIndex(index: Int) {
         val oldIndex = currentIndex
         currentIndex = index
-        if (oldIndex >= 0) notifyItemChanged(oldIndex)
-        if (index >= 0) notifyItemChanged(index)
+        if (oldIndex >= 0 && oldIndex < lyrics.size) notifyItemChanged(oldIndex, "index_update")
+        if (index >= 0 && index < lyrics.size) notifyItemChanged(index, "index_update")
+        if (oldIndex >= 0 && oldIndex < lyrics.size) {
+            if (oldIndex + 1 < lyrics.size) notifyItemChanged(oldIndex + 1, "index_update")
+            if (oldIndex - 1 >= 0) notifyItemChanged(oldIndex - 1, "index_update")
+        }
+        if (index >= 0 && index < lyrics.size) {
+            if (index + 1 < lyrics.size) notifyItemChanged(index + 1, "index_update")
+            if (index - 1 >= 0) notifyItemChanged(index - 1, "index_update")
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): LyricViewHolder {
@@ -1153,8 +1310,16 @@ class LyricsFocusAdapter : RecyclerView.Adapter<LyricsFocusAdapter.LyricViewHold
         return LyricViewHolder(view)
     }
 
+    override fun onBindViewHolder(holder: LyricViewHolder, position: Int, payloads: List<Any>) {
+        if (payloads.isNotEmpty()) {
+            holder.bind(lyrics[position], position, currentIndex)
+        } else {
+            super.onBindViewHolder(holder, position, payloads)
+        }
+    }
+
     override fun onBindViewHolder(holder: LyricViewHolder, position: Int) {
-        holder.bind(lyrics[position], position == currentIndex, position, currentIndex)
+        holder.bind(lyrics[position], position, currentIndex)
     }
 
     override fun getItemCount() = lyrics.size
@@ -1162,28 +1327,23 @@ class LyricsFocusAdapter : RecyclerView.Adapter<LyricsFocusAdapter.LyricViewHold
     class LyricViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvLyricLine: TextView = itemView.findViewById(R.id.tvLyricLine)
 
-        fun bind(lyric: LyricLine, isCurrent: Boolean, position: Int, currentIndex: Int) {
+        fun bind(lyric: LyricLine, position: Int, currentIndex: Int) {
             tvLyricLine.text = lyric.text
 
             when {
                 position == currentIndex -> {
-                    tvLyricLine.alpha = 0.9f
-                    tvLyricLine.textSize = 26f
+                    tvLyricLine.alpha = ACTIVE_ALPHA
+                    tvLyricLine.textSize = ACTIVE_SIZE
                     tvLyricLine.setTextColor(itemView.context.getColor(R.color.text_primary))
                 }
                 position == currentIndex + 1 -> {
-                    tvLyricLine.alpha = 0.4f
-                    tvLyricLine.textSize = 18f
+                    tvLyricLine.alpha = INACTIVE_ALPHA + 0.1f
+                    tvLyricLine.textSize = NEXT_SIZE
                     tvLyricLine.setTextColor(itemView.context.getColor(R.color.text_secondary))
                 }
-                position < currentIndex -> {
-                    tvLyricLine.alpha = 0.2f
-                    tvLyricLine.textSize = 16f
-                    tvLyricLine.setTextColor(itemView.context.getColor(R.color.text_tertiary))
-                }
                 else -> {
-                    tvLyricLine.alpha = 0.2f
-                    tvLyricLine.textSize = 16f
+                    tvLyricLine.alpha = INACTIVE_ALPHA
+                    tvLyricLine.textSize = INACTIVE_SIZE
                     tvLyricLine.setTextColor(itemView.context.getColor(R.color.text_tertiary))
                 }
             }

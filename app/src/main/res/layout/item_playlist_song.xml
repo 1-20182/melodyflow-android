@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
+    android:layout_height="72dp"
     android:background="?attr/selectableItemBackground"
     android:contentDescription="歌曲"
     android:gravity="center_vertical"
@@ -11,19 +12,28 @@
     <!-- Position number -->
     <TextView
         android:id="@+id/tvPosition"
-        android:layout_width="24dp"
+        android:layout_width="32dp"
         android:layout_height="wrap_content"
+        android:gravity="center"
         android:textColor="@color/text_secondary"
         android:textSize="@dimen/text_size_subtitle" />
 
     <!-- Cover thumbnail -->
-    <ImageView
-        android:id="@+id/ivCover"
-        android:layout_width="@dimen/cover_size_mini"
-        android:layout_height="@dimen/cover_size_mini"
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="52dp"
+        android:layout_height="52dp"
         android:layout_marginStart="@dimen/spacing_md"
-        android:contentDescription="封面"
-        android:scaleType="centerCrop" />
+        app:cardCornerRadius="10dp"
+        app:cardElevation="0dp">
+
+        <ImageView
+            android:id="@+id/ivCover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="封面"
+            android:scaleType="centerCrop" />
+
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Song info -->
     <LinearLayout
@@ -40,7 +50,8 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_size_subtitle" />
+            android:textSize="16sp"
+            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/tvArtist"
@@ -50,6 +61,17 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_size_body" />
+            android:textSize="14sp" />
     </LinearLayout>
+
+    <!-- 正在播放指示器 -->
+    <ImageView
+        android:id="@+id/ivPlayingIndicator"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="@dimen/spacing_md"
+        android:src="@drawable/ic_equalizer"
+        android:tint="@color/primary"
+        android:visibility="gone" />
+
 </LinearLayout>

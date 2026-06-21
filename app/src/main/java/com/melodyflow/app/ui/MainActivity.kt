@@ -134,17 +134,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 检查启动页面设置
-        val prefs = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
-        val startupPage = prefs.getString("startup_page", "home") ?: "home"
-        val hasAgreed = prefs.getBoolean("has_agreed_to_terms", false)
-
-        // 如果设置为AI推荐页面且已同意协议，则跳转到AI推荐页面
-        if (startupPage == "ai" && hasAgreed) {
-            startActivity(Intent(this, AIRecommendationActivity::class.java))
-            // 继续初始化MainActivity，但用户会看到AI页面
-        }
-
         setContentView(R.layout.activity_main)
 
         com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
@@ -161,6 +150,25 @@ class MainActivity : AppCompatActivity() {
         setupBottomNav()
         setupMiniPlayer()
         setupAnimations()
+
+        // 检查启动页面设置 或 外部跳转
+        val navTo = intent.getStringExtra("nav_to")
+        val prefs = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
+        val startupPage = prefs.getString("startup_page", "home") ?: "home"
+        val startPosition = when {
+            navTo == "ai" -> 3
+            startupPage == "ai" -> 3
+            else -> 0
+        }
+        viewPager.setCurrentItem(startPosition, false)
+        updateNavSelection(startPosition)
+        bottomNav?.selectedItemId = when (startPosition) {
+            0 -> R.id.nav_home
+            1 -> R.id.nav_search
+            2 -> R.id.nav_library
+            3 -> R.id.nav_ai
+            else -> R.id.nav_home
+        }
 
         checkPermissions()
         checkAndShowInfoDialog()
@@ -265,35 +273,28 @@ class MainActivity : AppCompatActivity() {
         val navHome = findViewById<View?>(R.id.navHome)
         val navSearch = findViewById<View?>(R.id.navSearch)
         val navLibrary = findViewById<View?>(R.id.navLibrary)
+        val navAI = findViewById<View?>(R.id.navAI)
         val navSettings = findViewById<View?>(R.id.navSettings)
         
-        android.util.Log.d("MainActivity", "navHome found: ${navHome != null}")
-        android.util.Log.d("MainActivity", "navSearch found: ${navSearch != null}")
-        android.util.Log.d("MainActivity", "navLibrary found: ${navLibrary != null}")
-        android.util.Log.d("MainActivity", "navSettings found: ${navSettings != null}")
-        
         navHome?.setOnClickListener {
-            android.util.Log.d("MainActivity", "navHome clicked")
             viewPager.setCurrentItem(0, true)
             updateNavSelection(0)
         }
         navSearch?.setOnClickListener {
-            android.util.Log.d("MainActivity", "navSearch clicked")
             viewPager.setCurrentItem(1, true)
             updateNavSelection(1)
         }
         navLibrary?.setOnClickListener {
-            android.util.Log.d("MainActivity", "navLibrary clicked")
             viewPager.setCurrentItem(2, true)
             updateNavSelection(2)
         }
+        navAI?.setOnClickListener {
+            viewPager.setCurrentItem(3, true)
+            updateNavSelection(3)
+        }
         navSettings?.setOnClickListener {
-            android.util.Log.d("MainActivity", "navSettings clicked")
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-
-        // Set initial nav selection
-        updateNavSelection(0)
     }
 
     private fun updateNavSelection(position: Int) {
@@ -301,6 +302,7 @@ class MainActivity : AppCompatActivity() {
         val navHome = findViewById<View?>(R.id.navHome)
         val navSearch = findViewById<View?>(R.id.navSearch)
         val navLibrary = findViewById<View?>(R.id.navLibrary)
+        val navAI = findViewById<View?>(R.id.navAI)
         val navSettings = findViewById<View?>(R.id.navSettings)
 
         // Get colors
@@ -322,9 +324,14 @@ class MainActivity : AppCompatActivity() {
             it.setColorFilter(if (position == 2) primaryColor else textSecondaryColor)
         }
 
+        // Update navAI
+        navAI?.findViewById<ImageView>(R.id.navAIIcon)?.let {
+            it.setColorFilter(if (position == 3) primaryColor else textSecondaryColor)
+        }
+
         // Update navSettings
         navSettings?.findViewById<ImageView>(R.id.navSettingsIcon)?.let {
-            it.setColorFilter(if (position == 3) primaryColor else textSecondaryColor)
+            it.setColorFilter(textSecondaryColor)
         }
     }
 
@@ -402,7 +409,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupViewPager() {
         viewPager.adapter = MainPagerAdapter(this)
         viewPager.isUserInputEnabled = true
-        viewPager.offscreenPageLimit = 3
+        viewPager.offscreenPageLimit = 4
 
         // 优化的页面堆叠切换动画 - 视差效果
         viewPager.setPageTransformer { page, position ->
@@ -458,6 +465,7 @@ class MainActivity : AppCompatActivity() {
                     0 -> R.id.nav_home
                     1 -> R.id.nav_search
                     2 -> R.id.nav_library
+                    3 -> R.id.nav_ai
                     else -> R.id.nav_home
                 }
                 bottomNav?.selectedItemId = itemId
@@ -473,6 +481,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_home -> 0
                 R.id.nav_search -> 1
                 R.id.nav_library -> 2
+                R.id.nav_ai -> 3
                 else -> 0
             }
             viewPager.setCurrentItem(position, true)

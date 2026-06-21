@@ -1,6 +1,7 @@
 package com.melodyflow.app.adapter
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -10,9 +11,14 @@ import com.melodyflow.app.databinding.ItemPlaylistSongBinding
 import com.melodyflow.app.model.Song
 
 class PlaylistAdapter(
-    private val currentSongId: String?,
+    private var currentSongId: String?,
     private val onItemClick: (Song) -> Unit
 ) : ListAdapter<Song, PlaylistAdapter.ViewHolder>(SongDiffCallback()) {
+
+    fun updateCurrentSongId(songId: String?) {
+        currentSongId = songId
+        notifyDataSetChanged()
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemPlaylistSongBinding.inflate(
@@ -31,7 +37,6 @@ class PlaylistAdapter(
         RecyclerView.ViewHolder(binding.root) {
 
         fun bind(song: Song, position: Int) {
-            binding.tvPosition.text = "${position + 1}"
             binding.tvTitle.text = song.name
             binding.tvArtist.text = song.artist
 
@@ -45,14 +50,21 @@ class PlaylistAdapter(
             // Highlight current playing song
             val isCurrent = song.id == currentSongId
             binding.root.isSelected = isCurrent
-            binding.tvPosition.setTextColor(
-                if (isCurrent) binding.root.context.getColor(com.melodyflow.app.R.color.primary)
-                else binding.root.context.getColor(com.melodyflow.app.R.color.text_secondary)
-            )
-            binding.tvTitle.setTextColor(
-                if (isCurrent) binding.root.context.getColor(com.melodyflow.app.R.color.primary)
-                else binding.root.context.getColor(com.melodyflow.app.R.color.text_primary)
-            )
+
+            if (isCurrent) {
+                binding.tvPosition.visibility = View.GONE
+                binding.ivPlayingIndicator.visibility = View.VISIBLE
+                binding.tvTitle.setTextColor(binding.root.context.getColor(com.melodyflow.app.R.color.primary))
+                binding.tvTitle.setTypeface(null, android.graphics.Typeface.BOLD)
+                binding.root.setBackgroundColor(binding.root.context.getColor(com.melodyflow.app.R.color.surface_variant))
+            } else {
+                binding.tvPosition.text = "${position + 1}"
+                binding.tvPosition.visibility = View.VISIBLE
+                binding.ivPlayingIndicator.visibility = View.GONE
+                binding.tvTitle.setTextColor(binding.root.context.getColor(com.melodyflow.app.R.color.text_primary))
+                binding.tvTitle.setTypeface(null, android.graphics.Typeface.NORMAL)
+                binding.root.setBackgroundColor(binding.root.context.getColor(com.melodyflow.app.R.color.background))
+            }
 
             binding.root.setOnClickListener { onItemClick(song) }
         }

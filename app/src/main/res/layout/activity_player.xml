@@ -53,9 +53,22 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/player_favorite"
         android:src="@drawable/ic_favorite_border"
-        app:layout_constraintEnd_toStartOf="@id/btnMore"
+        app:layout_constraintEnd_toStartOf="@id/btnLyrics"
         app:layout_constraintTop_toTopOf="parent"
         app:tint="@color/primary" />
+
+    <ImageButton
+        android:id="@+id/btnLyrics"
+        android:layout_width="@dimen/control_button_default"
+        android:layout_height="@dimen/control_button_default"
+        android:layout_marginEnd="@dimen/spacing_sm"
+        android:layout_marginTop="@dimen/spacing_lg"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="查看歌词"
+        android:src="@drawable/ic_lyrics"
+        app:layout_constraintEnd_toStartOf="@id/btnMore"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/text_primary" />
 
     <ImageButton
         android:id="@+id/btnMore"
@@ -298,13 +311,13 @@
             android:textSize="14sp"
             android:visibility="gone" />
 
-        <!-- 提示：点击封面查看全屏歌词 -->
+        <!-- 提示：左右滑动查看全屏歌词 -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center|bottom"
             android:layout_marginBottom="2dp"
-            android:text="点击封面查看歌词"
+            android:text="左右滑动查看歌词"
             android:textSize="10sp"
             android:textColor="@color/text_tertiary"
             android:alpha="0.5" />

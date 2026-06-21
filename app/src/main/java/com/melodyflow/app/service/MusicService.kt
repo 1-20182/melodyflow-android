@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.media.MediaPlayer
+import android.media.PlaybackParams
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -121,6 +122,8 @@ class MusicService : MediaBrowserServiceCompat() {
 
     private var playbackVersion = 0
 
+    private var playbackSpeed = 1.0f
+
     enum class PlayMode {
         SEQUENCE, RANDOM, SINGLE, LOOP
     }
@@ -142,6 +145,9 @@ class MusicService : MediaBrowserServiceCompat() {
         musicRepository = MusicRepository.getInstance(this)
         createNotificationChannel()
         initMediaSession()
+        // 加载保存的播放速度
+        playbackSpeed = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
+            .getFloat("playback_speed", 1.0f)
     }
 
     private val musicCacheDir by lazy {
@@ -497,6 +503,15 @@ class MusicService : MediaBrowserServiceCompat() {
                     }
                     isPlayerPrepared = true
                     start()
+                    // 应用保存的播放速度（需要 API 23+）
+                    if (playbackSpeed != 1.0f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val params = PlaybackParams().setSpeed(playbackSpeed)
+                            setPlaybackParams(params)
+                        } catch (e: Exception) {
+                            android.util.Log.w("MusicService", "Apply speed failed: ${e.message}")
+                        }
+                    }
                     updateMetadata(song)
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
                     startForeground(NOTIFICATION_ID, buildNotification())
@@ -688,6 +703,27 @@ class MusicService : MediaBrowserServiceCompat() {
         }
     }
     fun isPrepared(): Boolean = isPlayerPrepared
+
+    fun setSpeed(speed: Float) {
+        playbackSpeed = speed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            mediaPlayer?.let { player ->
+                try {
+                    val params = PlaybackParams().setSpeed(speed)
+                    player.setPlaybackParams(params)
+                } catch (e: Exception) {
+                    android.util.Log.w("MusicService", "setSpeed failed: ${e.message}")
+                }
+            }
+        }
+        // 持久化速度偏好
+        getSharedPreferences("MelodyFlow", MODE_PRIVATE)
+            .edit().putFloat("playback_speed", speed).apply()
+    }
+
+    fun getSpeed(): Float = playbackSpeed
+
+    fun getAudioSessionId(): Int = mediaPlayer?.audioSessionId ?: 0
 
     private fun updateMetadata(song: Song) {
         val metadata = MediaMetadataCompat.Builder()

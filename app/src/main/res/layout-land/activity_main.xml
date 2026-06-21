@@ -100,6 +100,26 @@
                     android:focusable="false"/>
             </FrameLayout>
 
+            <FrameLayout
+                android:id="@+id/navAI"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_marginBottom="8dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/navAIIcon"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_sparkle"
+                    android:tint="@color/text_secondary"
+                    android:layout_gravity="center"
+                    android:clickable="false"
+                    android:focusable="false"/>
+            </FrameLayout>
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="0dp"

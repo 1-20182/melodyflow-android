@@ -13,8 +13,8 @@ android {
         applicationId = "com.melodyflow.app"
         minSdk = 21
         targetSdk = 34
-        versionCode = 8
-        versionName = "2.1.0"
+        versionCode = 9
+        versionName = "2.2.0"
         }
 
     testOptions {
