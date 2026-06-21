@@ -104,3 +104,7 @@ app/debug/
 # Gradle cache
 gradle-home/
 gradle-tmp/
+
+# AI execution plans & design docs
+.trae/
+design/
