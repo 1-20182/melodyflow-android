@@ -1,5 +1,6 @@
 package com.melodyflow.app.ui
 
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
@@ -10,10 +11,13 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.melodyflow.app.BuildConfig
 import com.melodyflow.app.R
 import com.melodyflow.app.data.CacheManager
+import com.melodyflow.app.util.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,6 +83,7 @@ class SettingsActivity : AppCompatActivity() {
         loadBackgroundPreview()
         setupGradientPresets()
         setupStartupPageSettings()
+        setupVersionDisplay()
 
         btnClearCache.setOnClickListener { clearCache() }
         btnClearMusicCache.setOnClickListener { clearMusicCache() }
@@ -100,6 +105,11 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, InfoDialogActivity::class.java).apply {
                 putExtra(InfoDialogActivity.EXTRA_SHOW_ONLY_CHANGELOG, true)
             })
+        }
+
+        // Check Update button
+        findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCheckUpdate)?.setOnClickListener {
+            checkForUpdate()
         }
     }
 
@@ -147,6 +157,11 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupVersionDisplay() {
+        val tvVersion = findViewById<TextView>(R.id.tvVersion)
+        tvVersion.text = getString(R.string.setting_version, BuildConfig.VERSION_NAME)
+    }
+
     private fun applyGradientPreset(checkedId: Int) {
         val index = checkedId - 1
         if (index >= 0 && index < gradientPresets.size) {
@@ -154,6 +169,17 @@ class SettingsActivity : AppCompatActivity() {
             editor.putInt("gradient_start", gradientPresets[index][0])
             editor.putInt("gradient_end", gradientPresets[index][1])
             editor.apply()
+
+            // 删除旧的图片背景，确保渐变优先
+            if (bgFile.exists()) bgFile.delete()
+
+            // 清除缓存并立即应用到当前 Activity
+            com.melodyflow.app.util.BackgroundManager.clearCache()
+            com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
+
+            // 通知其他 Activity 更新背景
+            sendBroadcast(Intent("com.melodyflow.app.BACKGROUND_CHANGED"))
+
             loadBackgroundPreview()
             Toast.makeText(this, "背景已更新", Toast.LENGTH_SHORT).show()
         }
@@ -287,6 +313,49 @@ class SettingsActivity : AppCompatActivity() {
 
         loadBackgroundPreview()
         Toast.makeText(this, "已恢复默认背景", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun checkForUpdate() {
+        val btn = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCheckUpdate)
+        btn?.isEnabled = false
+        btn?.text = "检查中..."
+
+        lifecycleScope.launch {
+            val updateInfo = UpdateChecker().checkForUpdate()
+
+            btn?.isEnabled = true
+            btn?.text = "检查更新"
+
+            if (!updateInfo.hasUpdate) {
+                Toast.makeText(this@SettingsActivity, "当前已是最新版本", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            showUpdateDialog(updateInfo.latestVersion, updateInfo.changelog, updateInfo.downloadUrl)
+        }
+    }
+
+    private fun showUpdateDialog(version: String, changelog: String, downloadUrl: String) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_update, null)
+        dialogView.findViewById<TextView>(R.id.tvUpdateVersion).text = version
+        dialogView.findViewById<TextView>(R.id.tvUpdateChangelog).text = changelog
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(true)
+            .create()
+
+        dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnUpdateNow)
+            .setOnClickListener {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                startActivity(intent)
+                dialog.dismiss()
+            }
+
+        dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnUpdateLater)
+            .setOnClickListener { dialog.dismiss() }
+
+        dialog.show()
     }
 
     private fun getFolderSize(file: File): Long {

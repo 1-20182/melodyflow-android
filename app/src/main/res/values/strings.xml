@@ -5,6 +5,7 @@
     <string name="nav_home">首页</string>
     <string name="nav_search">搜索</string>
     <string name="nav_library">我的</string>
+    <string name="nav_ai">AI推荐</string>
 
     <string name="home_title">发现音乐</string>
     <string name="charts_title">排行榜</string>
@@ -56,7 +57,7 @@
     <string name="setting_clear_history">清空播放历史</string>
     <string name="setting_clear_favorites">清空收藏</string>
     <string name="setting_about">关于</string>
-    <string name="setting_version">版本 1.0.0</string>
+    <string name="setting_version">版本 %s</string>
 
     <string name="confirm">确定</string>
     <string name="cancel">取消</string>

@@ -1,5 +1,6 @@
 package com.melodyflow.app.ui
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
@@ -8,6 +9,7 @@ import android.media.audiofx.Equalizer
 import android.media.audiofx.Virtualizer
 import android.os.Bundle
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
@@ -16,16 +18,21 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.melodyflow.app.R
-import com.melodyflow.app.service.MusicService
 
 class EqualizerActivity : AppCompatActivity() {
 
     companion object {
-        fun start(context: Context) {
-            val intent = Intent(context, EqualizerActivity::class.java)
+        private const val EXTRA_AUDIO_SESSION_ID = "audio_session_id"
+        private const val ANIM_DURATION = 300L
+
+        fun start(context: Context, audioSessionId: Int = 0) {
+            val intent = Intent(context, EqualizerActivity::class.java).apply {
+                putExtra(EXTRA_AUDIO_SESSION_ID, audioSessionId)
+            }
             context.startActivity(intent)
         }
     }
@@ -36,6 +43,10 @@ class EqualizerActivity : AppCompatActivity() {
     private lateinit var layoutBands: LinearLayout
     private lateinit var sliderBass: Slider
     private lateinit var sliderVirtualizer: Slider
+    private lateinit var tvBassValue: TextView
+    private lateinit var tvVirtualizerValue: TextView
+    private lateinit var tvBandRange: TextView
+    private lateinit var cardEnable: MaterialCardView
 
     private var equalizer: Equalizer? = null
     private var bassBoost: BassBoost? = null
@@ -43,15 +54,22 @@ class EqualizerActivity : AppCompatActivity() {
 
     private val bandSliders = mutableListOf<Slider>()
     private val presets = mutableListOf<String>()
+    private val presetNamesMap = mutableMapOf<String, String>()
     private var currentPreset = 0
 
     private lateinit var prefs: SharedPreferences
+    private var audioSessionId = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_equalizer)
 
         com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
+
+        audioSessionId = intent.getIntExtra(EXTRA_AUDIO_SESSION_ID, 0)
+        if (audioSessionId == 0) {
+            android.util.Log.w("EqualizerActivity", "No valid audio session ID, using default (0)")
+        }
 
         prefs = getSharedPreferences("MelodyFlow", MODE_PRIVATE)
 
@@ -67,6 +85,10 @@ class EqualizerActivity : AppCompatActivity() {
         layoutBands = findViewById(R.id.layoutBands)
         sliderBass = findViewById(R.id.sliderBass)
         sliderVirtualizer = findViewById(R.id.sliderVirtualizer)
+        tvBassValue = findViewById(R.id.tvBassValue)
+        tvVirtualizerValue = findViewById(R.id.tvVirtualizerValue)
+        tvBandRange = findViewById(R.id.tvBandRange)
+        cardEnable = findViewById(R.id.cardEnable)
 
         toolbar.setNavigationOnClickListener { finish() }
 
@@ -79,6 +101,7 @@ class EqualizerActivity : AppCompatActivity() {
             if (fromUser) {
                 setBassBoost(value.toInt())
                 prefs.edit().putInt("eq_bass", value.toInt()).apply()
+                tvBassValue.text = "${value.toInt() / 10}%"
             }
         }
 
@@ -86,32 +109,39 @@ class EqualizerActivity : AppCompatActivity() {
             if (fromUser) {
                 setVirtualizer(value.toInt())
                 prefs.edit().putInt("eq_virtualizer", value.toInt()).apply()
+                tvVirtualizerValue.text = "${value.toInt() / 10}%"
             }
         }
     }
 
     private fun initAudioEffects() {
         try {
-            // 尝试从 MusicService 获取音频会话
-            // 由于均衡器需要与具体的播放器关联，这里创建独立的均衡器
-            // 在实际使用中，应该与 MusicService 的 AudioSession 关联
-            
-            // 创建一个虚拟的音频会话
-            val audioSessionId = android.media.MediaPlayer::class.java
-            // 注意：这里需要与实际播放器关联
-            // 由于 MusicService 使用自己的 MediaPlayer，我们需要获取其 session ID
-            
-            // 暂时创建一个通用的均衡器
-            // 这个实现需要在 MusicService 集成时进一步完善
+            val sessionId = if (audioSessionId != 0) audioSessionId else 0
+
             equalizer = try {
-                Equalizer(0, 0)
+                Equalizer(0, sessionId)
             } catch (e: Exception) {
+                android.util.Log.w("EqualizerActivity", "Failed to create Equalizer: ${e.message}")
                 Toast.makeText(this, "无法初始化均衡器", Toast.LENGTH_SHORT).show()
                 null
             }
 
             if (equalizer != null) {
                 setupEqualizerBands()
+            }
+
+            try {
+                bassBoost = BassBoost(0, sessionId)
+                bassBoost?.enabled = false
+            } catch (e: Exception) {
+                android.util.Log.w("EqualizerActivity", "BassBoost not supported: ${e.message}")
+            }
+
+            try {
+                virtualizer = Virtualizer(0, sessionId)
+                virtualizer?.enabled = false
+            } catch (e: Exception) {
+                android.util.Log.w("EqualizerActivity", "Virtualizer not supported: ${e.message}")
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -126,13 +156,54 @@ class EqualizerActivity : AppCompatActivity() {
             val minLevel = range[0]
             val maxLevel = range[1]
 
-            // 获取预设
+            // Update band range text
+            val firstFreq = formatFrequency(eq.getCenterFreq(0.toShort()) / 1000)
+            val lastFreq = formatFrequency(eq.getCenterFreq((numBands - 1).toShort()) / 1000)
+            tvBandRange.text = "${firstFreq} ~ ${lastFreq}"
+
+            // 预设名称中英文映射
+            val nameTranslation = mapOf(
+                "Normal" to "标准",
+                "Classical" to "古典",
+                "Dance" to "舞曲",
+                "Flat" to "平坦",
+                "Folk" to "民谣",
+                "Heavy Metal" to "重金属",
+                "Hip Hop" to "嘻哈",
+                "Jazz" to "爵士",
+                "Pop" to "流行",
+                "Rock" to "摇滚",
+                "Bass Booster" to "低音增强",
+                "Treble Booster" to "高音增强",
+                "Vocal Booster" to "人声增强",
+                "Acoustic" to "原声",
+                "Country" to "乡村",
+                "Latin" to "拉丁",
+                "Party" to "派对",
+                "Piano" to "钢琴",
+                "R&B" to "节奏蓝调",
+                "Ska" to "斯卡",
+                "Soft Rock" to "轻摇滚",
+                "Soul" to "灵魂",
+                "Reggae" to "雷鬼",
+                "Blues" to "布鲁斯",
+                "Electronic" to "电子",
+                "Default" to "默认",
+                "Custom" to "自定义"
+            )
+
             presets.clear()
+            presetNamesMap.clear()
+            presets.add("自定义")
+            presetNamesMap["Custom"] = "自定义"
+
             for (i in 0 until eq.numberOfPresets) {
-                presets.add(eq.getPresetName(i.toShort()))
+                val systemName = eq.getPresetName(i.toShort())
+                val chineseName = nameTranslation[systemName] ?: systemName
+                presets.add(chineseName)
+                presetNamesMap[systemName] = chineseName
             }
 
-            // 设置 Spinner
             val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, presets)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             spinnerPreset.adapter = adapter
@@ -140,14 +211,18 @@ class EqualizerActivity : AppCompatActivity() {
             spinnerPreset.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                     currentPreset = position
-                    eq.usePreset(position.toShort())
-                    updateBandLevels()
+                    if (position == 0) {
+                        prefs.edit().putInt("eq_preset", position).apply()
+                        return
+                    }
+                    val systemPresetIndex = (position - 1).toShort()
+                    eq.usePreset(systemPresetIndex)
+                    animatePresetChange()
                     prefs.edit().putInt("eq_preset", position).apply()
                 }
                 override fun onNothingSelected(parent: AdapterView<*>?) {}
             }
 
-            // 创建频段滑块
             bandSliders.clear()
             layoutBands.removeAllViews()
 
@@ -172,13 +247,16 @@ class EqualizerActivity : AppCompatActivity() {
                         if (fromUser) {
                             eq.setBandLevel(i.toShort(), value.toInt().toShort())
                             prefs.edit().putInt("eq_band_$i", value.toInt()).apply()
-                            // 切换到自定义预设
                             if (currentPreset != 0) {
                                 spinnerPreset.setSelection(0)
                             }
                         }
                     }
                 }
+
+                // Apply custom slider style via code
+                slider.setThumbRadius(resources.getDimensionPixelSize(R.dimen.corner_radius_small))
+                slider.trackHeight = resources.getDimensionPixelSize(R.dimen.spacing_xs)
 
                 val freqText = formatFrequency(eq.getCenterFreq(i.toShort()) / 1000)
 
@@ -194,21 +272,6 @@ class EqualizerActivity : AppCompatActivity() {
                 layoutBands.addView(bandLayout)
                 bandSliders.add(slider)
             }
-
-            // 尝试初始化 BassBoost 和 Virtualizer
-            try {
-                bassBoost = BassBoost(0, 0)
-                bassBoost?.enabled = switchEnable.isChecked
-            } catch (e: Exception) {
-                // 不支持
-            }
-
-            try {
-                virtualizer = Virtualizer(0, 0)
-                virtualizer?.enabled = switchEnable.isChecked
-            } catch (e: Exception) {
-                // 不支持
-            }
         }
     }
 
@@ -218,6 +281,35 @@ class EqualizerActivity : AppCompatActivity() {
         } else {
             "$freq"
         }
+    }
+
+    /**
+     * Animate all band sliders to their current equalizer levels smoothly
+     */
+    private fun animatePresetChange() {
+        equalizer?.let { eq ->
+            for (i in bandSliders.indices) {
+                val targetValue = eq.getBandLevel(i.toShort()).toFloat()
+                val currentValue = bandSliders[i].value
+                if (currentValue != targetValue) {
+                    animateSliderValue(bandSliders[i], currentValue, targetValue, ANIM_DURATION)
+                }
+            }
+        }
+    }
+
+    /**
+     * Smoothly animate a slider from start to end value using ValueAnimator
+     */
+    private fun animateSliderValue(slider: Slider, start: Float, end: Float, duration: Long) {
+        val animator = ValueAnimator.ofFloat(start, end).apply {
+            this.duration = duration
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animation ->
+                slider.value = animation.animatedValue as Float
+            }
+        }
+        animator.start()
     }
 
     private fun updateBandLevels() {
@@ -237,6 +329,14 @@ class EqualizerActivity : AppCompatActivity() {
         sliderVirtualizer.isEnabled = enabled
         bandSliders.forEach { it.isEnabled = enabled }
         spinnerPreset.isEnabled = enabled
+
+        // Fade animation for the enable card
+        val alpha = if (enabled) 1f else 0.5f
+        cardEnable.animate()
+            .alpha(alpha)
+            .setDuration(200)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
     }
 
     private fun setBassBoost(strength: Int) {
@@ -267,9 +367,11 @@ class EqualizerActivity : AppCompatActivity() {
 
         val bass = prefs.getInt("eq_bass", 0)
         sliderBass.value = bass.toFloat()
+        tvBassValue.text = "${bass / 10}%"
 
         val virtualizerStrength = prefs.getInt("eq_virtualizer", 0)
         sliderVirtualizer.value = virtualizerStrength.toFloat()
+        tvVirtualizerValue.text = "${virtualizerStrength / 10}%"
     }
 
     override fun onDestroy() {

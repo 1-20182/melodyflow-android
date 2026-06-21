@@ -13,9 +13,15 @@ android {
         applicationId = "com.melodyflow.app"
         minSdk = 21
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.0.0"
+        versionCode = 8
+        versionName = "2.1.0"
         }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 
     buildTypes {
         debug {
@@ -96,4 +102,9 @@ dependencies {
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Test dependencies
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito:mockito-core:4.11.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
