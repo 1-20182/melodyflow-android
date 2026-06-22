@@ -33,6 +33,7 @@ import android.widget.TextView
 import android.widget.SeekBar
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.viewModels
@@ -89,6 +90,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var tvArtist: TextView
     // Background blur
     private var bgBlurImage: ImageView? = null
+    private var bgGradientMask: View? = null
     // Lyrics preview (landscape mode)
     private var lyricsPreviewContainer: View? = null
     private var rvLyricsPreview: RecyclerView? = null
@@ -348,12 +350,34 @@ class PlayerActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         BackgroundManager.applyToActivity(this)
+        updateBackgroundOverlayVisibility()
         handler.post(updateProgressRunnable)
     }
 
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(updateProgressRunnable)
+    }
+
+    /**
+     * Check whether the user has set a custom background image or gradient.
+     */
+    private fun hasCustomBackground(): Boolean {
+        val prefs = getSharedPreferences("MelodyFlow", Context.MODE_PRIVATE)
+        val bgFile = File(filesDir, "custom_background.jpg")
+        val gradientStart = prefs.getInt("gradient_start", 0)
+        val gradientEnd = prefs.getInt("gradient_end", 0)
+        return bgFile.exists() || (gradientStart != 0 && gradientEnd != 0)
+    }
+
+    /**
+     * Show/hide the landscape cover-blur and gradient mask so that a user-set
+     * custom background is not hidden behind them.
+     */
+    private fun updateBackgroundOverlayVisibility() {
+        val custom = hasCustomBackground()
+        bgBlurImage?.visibility = if (custom) View.GONE else View.VISIBLE
+        bgGradientMask?.visibility = if (custom) View.GONE else View.VISIBLE
     }
 
     private fun initViews() {
@@ -397,8 +421,10 @@ class PlayerActivity : AppCompatActivity() {
         btnCoverPlay = findViewById(R.id.btnCoverPlay)
         tvTitle = findViewById(R.id.tvTitle)
         tvArtist = findViewById(R.id.tvArtist)
-        // Background blur (optional, may not exist in portrait)
+        // Background blur / gradient mask (optional, may not exist in portrait)
         bgBlurImage = findViewById<ImageView>(R.id.bgBlurImage)
+        bgGradientMask = findViewById(R.id.bgGradientMask)
+        updateBackgroundOverlayVisibility()
 
         // Lyrics preview views (landscape mode)
         lyricsPreviewContainer = findViewById(R.id.lyricsPreviewContainer)
@@ -541,15 +567,17 @@ class PlayerActivity : AppCompatActivity() {
                 })
                 .into(ivCover)
             
-            // Load background blur (for landscape mode)
-            bgBlurImage?.let { bgImage ->
-                Glide.with(this)
-                    .load(coverUrl)
-                    .placeholder(R.drawable.ic_music_note)
-                    .error(R.drawable.ic_music_note)
-                    .centerCrop()
-                    .transform(jp.wasabeef.glide.transformations.BlurTransformation(25, 3))
-                    .into(bgImage)
+            // Load background blur (for landscape mode) only when no custom background is set
+            if (!hasCustomBackground()) {
+                bgBlurImage?.let { bgImage ->
+                    Glide.with(this)
+                        .load(coverUrl)
+                        .placeholder(R.drawable.ic_music_note)
+                        .error(R.drawable.ic_music_note)
+                        .centerCrop()
+                        .transform(jp.wasabeef.glide.transformations.BlurTransformation(25, 3))
+                        .into(bgImage)
+                }
             }
         } catch (e: Exception) {
             Logger.e("PlayerActivity", "Error loading cover: ${e.message}", e)

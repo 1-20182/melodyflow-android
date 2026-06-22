@@ -45,7 +45,8 @@
             android:name=".ui.PlayerActivity"
             android:exported="false"
             android:screenOrientation="unspecified"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:theme="@style/Theme.MelodyFlow.NoActionBar" />
 
         <activity
             android:name=".ui.PlaylistImportActivity"
