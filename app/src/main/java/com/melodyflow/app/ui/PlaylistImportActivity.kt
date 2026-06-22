@@ -121,7 +121,7 @@ class UrlImportFragment : Fragment() {
             isItemPrefetchEnabled = true
             initialPrefetchItemCount = 10
         }
-        rvResults.setHasFixedSize(true)
+        rvResults.setHasFixedSize(false)
         rvResults.setItemViewCacheSize(20)
 
         btnParse.setOnClickListener { parsePlaylist() }
@@ -274,7 +274,7 @@ class TextImportFragment : Fragment() {
             isItemPrefetchEnabled = true
             initialPrefetchItemCount = 10
         }
-        rvResults.setHasFixedSize(true)
+        rvResults.setHasFixedSize(false)
         rvResults.setItemViewCacheSize(20)
 
         btnSearch.setOnClickListener { batchSearch() }
