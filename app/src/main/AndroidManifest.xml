@@ -80,7 +80,8 @@
         <activity
             android:name=".ui.CachedSongsActivity"
             android:exported="false"
-            android:screenOrientation="unspecified" />
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.MelodyFlow.NoActionBar" />
 
         <activity
             android:name=".ui.InfoDialogActivity"
