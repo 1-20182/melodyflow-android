@@ -7,6 +7,12 @@
 
 ## [Unreleased]
 
+## [2.3.4] - 2026-06-22
+
+### Fixed
+- 修复 AISettingsActivity、PlaylistActivity 与 CachedSongsActivity 因主题 ActionBar 与 Toolbar 共用导致的潜在闪退
+- 统一为所有调用 setSupportActionBar 的 Activity 应用 Theme.MelodyFlow.NoActionBar
+
 ## [2.3.3] - 2026-06-22
 
 ### Fixed
