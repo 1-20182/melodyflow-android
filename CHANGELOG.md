@@ -43,6 +43,8 @@
 - 修复横屏播放队列内容不同步与点击崩溃
 - 修复背景图片/渐变被 Fragment 不透明层遮挡的问题
 - 修复 PlayerActivity viewModel 未初始化导致的崩溃
+- 修复 layout_mini_player.xml 约束引用非同级视图的 lint 构建错误
+- 修复 PlaylistImportActivity 中 RecyclerView 高度 wrap_content 与 setHasFixedSize(true) 冲突的 lint 构建错误
 
 ### Security
 - 数据库升级使用 Migration(v6 → v7)，移除 fallbackToDestructiveMigration，避免升级丢数据
