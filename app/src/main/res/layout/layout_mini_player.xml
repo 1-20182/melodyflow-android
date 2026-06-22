@@ -25,10 +25,10 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_gravity="center"
-            app:cardBackgroundColor="#0A0A0A"
+            app:cardBackgroundColor="@color/vinyl_center_inner"
             app:cardCornerRadius="@dimen/cover_size_mini"
             app:cardElevation="4dp"
-            app:strokeColor="#1A1A1A"
+            app:strokeColor="@color/vinyl_groove"
             app:strokeWidth="1dp">
             <View
                 android:layout_width="match_parent"
@@ -58,7 +58,7 @@
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:layout_gravity="center"
-            app:cardBackgroundColor="#121212"
+            app:cardBackgroundColor="@color/vinyl_record_center"
             app:cardCornerRadius="8dp"
             app:cardElevation="2dp" />
     </FrameLayout>

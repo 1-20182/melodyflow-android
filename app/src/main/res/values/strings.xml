@@ -65,4 +65,7 @@
     <string name="error_network">网络错误，请稍后重试</string>
     <string name="add_favorite">已添加到收藏</string>
     <string name="remove_favorite">已取消收藏</string>
+
+    <string name="widget_calendar_desc">音乐日历 - 月视图</string>
+    <string name="widget_today_desc">今日音乐推荐</string>
 </resources>

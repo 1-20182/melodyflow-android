@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="mood_labels">
+        <item>开心</item>
+        <item>平静</item>
+        <item>伤感</item>
+        <item>兴奋</item>
+        <item>放松</item>
+        <item>焦虑</item>
+        <item>疲惫</item>
+        <item>浪漫</item>
+        <item>怀旧</item>
+        <item>励志</item>
+    </string-array>
+</resources>

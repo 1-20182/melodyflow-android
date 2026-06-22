@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
@@ -12,10 +14,15 @@ import androidx.room.RoomDatabase
         CacheEntity::class,
         AIConfigEntity::class,
         AIRecommendationEntity::class,
-        UserConversationEntity::class
+        UserConversationEntity::class,
+        CalendarEvent::class,
+        EventSong::class,
+        MusicDiary::class,
+        ListeningLog::class,
+        LocalSongEntity::class
     ],
-    version = 5,
-    exportSchema = false
+    version = 7,
+    exportSchema = true
 )
 abstract class MusicDatabase : RoomDatabase() {
     abstract fun favoriteDao(): FavoriteDao
@@ -24,10 +31,48 @@ abstract class MusicDatabase : RoomDatabase() {
     abstract fun aiConfigDao(): AIConfigDao
     abstract fun aiRecommendationDao(): AIRecommendationDao
     abstract fun userConversationDao(): UserConversationDao
+    abstract fun calendarEventDao(): CalendarEventDao
+    abstract fun eventSongDao(): EventSongDao
+    abstract fun musicDiaryDao(): MusicDiaryDao
+    abstract fun listeningLogDao(): ListeningLogDao
+    abstract fun localSongDao(): LocalSongDao
 
     companion object {
         @Volatile
         private var INSTANCE: MusicDatabase? = null
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add new columns to history table
+                db.execSQL("ALTER TABLE history ADD COLUMN playCount INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE history ADD COLUMN lastPlayedAt INTEGER NOT NULL DEFAULT 0")
+
+                // Set lastPlayedAt = playedAt for existing records
+                db.execSQL("UPDATE history SET lastPlayedAt = playedAt WHERE lastPlayedAt = 0")
+
+                // Remove duplicates keeping the one with smallest dbId (earliest inserted)
+                db.execSQL("DELETE FROM history WHERE dbId NOT IN (SELECT MIN(dbId) FROM history GROUP BY id)")
+
+                // Create unique index on id column
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_history_id ON history(id)")
+
+                // Create local_songs table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS local_songs (
+                        dbId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        filePath TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        artist TEXT NOT NULL,
+                        album TEXT NOT NULL,
+                        duration INTEGER NOT NULL DEFAULT 0,
+                        fileSize INTEGER NOT NULL DEFAULT 0,
+                        lastModified INTEGER NOT NULL DEFAULT 0,
+                        dateAdded INTEGER NOT NULL DEFAULT 0
+                    )
+                """)
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_local_songs_filePath ON local_songs(filePath)")
+            }
+        }
 
         fun getInstance(context: Context): MusicDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -35,7 +80,7 @@ abstract class MusicDatabase : RoomDatabase() {
                     context.applicationContext,
                     MusicDatabase::class.java,
                     "melodyflow_db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_6_7).build().also { INSTANCE = it }
             }
         }
     }

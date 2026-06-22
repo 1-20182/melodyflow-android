@@ -28,6 +28,20 @@ class SearchHistoryManager(context: Context) {
         }
     }
 
+    fun removeQuery(query: String) {
+        val history = getHistory().toMutableList()
+        if (history.remove(query)) {
+            prefs.edit {
+                putInt("count", history.size)
+                history.forEachIndexed { index, item ->
+                    putString("item_$index", item)
+                }
+                // 清除残留的旧数据
+                remove("item_${history.size}")
+            }
+        }
+    }
+
     fun clearHistory() {
         prefs.edit { clear() }
     }

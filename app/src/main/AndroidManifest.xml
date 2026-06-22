@@ -8,10 +8,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:name=".MelodyFlowApp"
         android:allowBackup="true"
+        android:requestLegacyExternalStorage="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/app_icon"
@@ -38,7 +45,7 @@
             android:name=".ui.PlayerActivity"
             android:exported="false"
             android:screenOrientation="unspecified"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden" />
 
         <activity
             android:name=".ui.PlaylistImportActivity"
@@ -124,5 +131,46 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".widget.MusicCalendarWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.melodyflow.app.action.MONTH_CHANGED" />
+                <action android:name="com.melodyflow.app.action.PREV_MONTH" />
+                <action android:name="com.melodyflow.app.action.NEXT_MONTH" />
+                <action android:name="com.melodyflow.app.action.DATE_CLICKED" />
+                <action android:name="com.melodyflow.app.action.TODAY_CLICKED" />
+                <action android:name="com.melodyflow.app.action.WIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_calendar_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.MusicTodayWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.melodyflow.app.action.UPDATE_TODAY" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/music_today_widget_info" />
+        </receiver>
+
+        <activity
+            android:name=".widget.MusicCalendarConfigActivity"
+            android:exported="true"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.MelodyFlow" />
+
+        <activity
+            android:name=".widget.MusicCalendarSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.MelodyFlow" />
     </application>
 </manifest>

@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Image Cache Card -->
+            <!-- ========== Cache Management Card ========== -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.MelodyFlow.GlassCard"
                 android:layout_width="match_parent"
@@ -45,11 +45,12 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="图片缓存"
+                        android:text="缓存管理"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_size_section"
                         android:textStyle="bold" />
 
+                    <!-- Total cache size -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -61,7 +62,32 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="缓存大小"
+                            android:text="总缓存大小"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="@dimen/text_size_subtitle" />
+
+                        <TextView
+                            android:id="@+id/tvTotalCacheSize"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 MB"
+                            android:textColor="@color/text_primary"
+                            android:textSize="@dimen/text_size_subtitle" />
+                    </LinearLayout>
+
+                    <!-- Image cache size -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="图片缓存"
                             android:textColor="@color/text_secondary"
                             android:textSize="@dimen/text_size_subtitle" />
 
@@ -74,25 +100,95 @@
                             android:textSize="@dimen/text_size_subtitle" />
                     </LinearLayout>
 
+                    <!-- Music cache size -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="音乐缓存"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="@dimen/text_size_subtitle" />
+
+                        <TextView
+                            android:id="@+id/tvMusicCacheSize"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0 MB (0 首歌曲)"
+                            android:textColor="@color/text_primary"
+                            android:textSize="@dimen/text_size_subtitle" />
+                    </LinearLayout>
+
+                    <!-- Cache limit slider -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="Glide 图片缓存"
-                        android:textColor="@color/text_disabled"
-                        android:textSize="@dimen/text_size_body" />
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="缓存上限"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_subtitle" />
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderCacheLimit"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:stepSize="100"
+                            android:valueFrom="100"
+                            android:valueTo="2000" />
+
+                        <TextView
+                            android:id="@+id/tvCacheLimitValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:text="500 MB"
+                            android:textColor="@color/text_primary"
+                            android:textSize="@dimen/text_size_subtitle" />
+                    </LinearLayout>
+
+                    <!-- Clear all cache button -->
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearCache"
+                        android:id="@+id/btnClearAllCache"
                         style="@style/Widget.MelodyFlow.Button.Primary"
                         android:layout_width="wrap_content"
                         android:layout_height="40dp"
-                        android:layout_marginTop="@dimen/spacing_md"
-                        android:text="清除图片缓存" />
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="清除全部缓存"
+                        app:backgroundTint="@color/accent" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearCache"
+                        style="@style/Widget.MelodyFlow.Button.Outline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="仅清除图片缓存" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearMusicCache"
+                        style="@style/Widget.MelodyFlow.Button.Outline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="仅清除音乐缓存" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Music Cache Card -->
+            <!-- ========== Backup & Restore Card ========== -->
             <com.google.android.material.card.MaterialCardView
                 style="@style/Widget.MelodyFlow.GlassCard"
                 android:layout_width="match_parent"
@@ -108,15 +204,42 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="音乐缓存"
+                        android:text="备份与恢复"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_size_section"
                         android:textStyle="bold" />
 
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="导出或导入收藏、播放历史、日历事件等数据"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_subtitle" />
+
+                    <!-- Export backup -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnExportBackup"
+                        style="@style/Widget.MelodyFlow.Button.Primary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="导出备份" />
+
+                    <!-- Import backup -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnImportBackup"
+                        style="@style/Widget.MelodyFlow.Button.Outline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="导入备份" />
+
+                    <!-- Auto backup toggle -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/spacing_base"
+                        android:layout_marginTop="@dimen/spacing_md"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
@@ -124,35 +247,111 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="缓存大小"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="@dimen/text_size_subtitle" />
-
-                        <TextView
-                            android:id="@+id/tvMusicCacheSize"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="0 MB (0 首歌曲)"
+                            android:text="自动备份"
                             android:textColor="@color/text_primary"
                             android:textSize="@dimen/text_size_subtitle" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchAutoBackup"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
                     </LinearLayout>
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/spacing_xs"
-                        android:text="已下载的音乐文件（支持离线播放）"
+                        android:text="开启后将在应用启动时自动备份数据"
                         android:textColor="@color/text_disabled"
                         android:textSize="@dimen/text_size_body" />
 
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- ========== Scan Directory Management Card ========== -->
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.MelodyFlow.GlassCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_md">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/spacing_base">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="扫描目录管理"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_size_section"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_sm"
+                        android:text="管理本地音乐扫描的目录"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_subtitle" />
+
+                    <!-- Default directories label -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="默认目录"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_body"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvDefaultScanDirs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="Music, Downloads, MelodyFlow/cache/music"
+                        android:textColor="@color/text_disabled"
+                        android:textSize="@dimen/text_size_body" />
+
+                    <!-- Custom directories -->
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_md"
+                        android:text="自定义目录"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_size_body"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutCustomScanDirs"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/tvNoCustomDirs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/spacing_xs"
+                        android:text="暂无自定义目录"
+                        android:textColor="@color/text_disabled"
+                        android:textSize="@dimen/text_size_body"
+                        android:visibility="gone" />
+
+                    <!-- Add directory button -->
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnClearMusicCache"
-                        style="@style/Widget.MelodyFlow.Button.Primary"
+                        android:id="@+id/btnAddScanDir"
+                        style="@style/Widget.MelodyFlow.Button.Outline"
                         android:layout_width="wrap_content"
                         android:layout_height="40dp"
                         android:layout_marginTop="@dimen/spacing_md"
-                        android:text="清除音乐缓存"
-                        app:backgroundTint="@color/accent" />
+                        android:text="添加目录" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

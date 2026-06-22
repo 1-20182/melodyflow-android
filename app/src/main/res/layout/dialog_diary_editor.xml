@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <EditText
+        android:id="@+id/et_diary_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="今天听了什么音乐？有什么感受？"
+        android:inputType="textMultiLine"
+        android:minLines="4" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="听歌前的心情"
+        android:layout_marginTop="12dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/spinner_mood_before"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:entries="@array/mood_labels" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="听歌后的心情"
+        android:layout_marginTop="8dp"
+        android:textSize="14sp" />
+
+    <Spinner
+        android:id="@+id/spinner_mood_after"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:entries="@array/mood_labels" />
+
+    <Button
+        android:id="@+id/btn_select_song"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="关联歌曲"
+        android:layout_marginTop="12dp" />
+
+</LinearLayout>

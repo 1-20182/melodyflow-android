@@ -9,14 +9,15 @@ import android.view.ViewGroup
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.melodyflow.app.MelodyFlowApp
 import com.melodyflow.app.R
 import com.melodyflow.app.adapter.ChartAdapter
 import com.melodyflow.app.model.Chart
+import com.melodyflow.app.viewmodel.HomeViewModel
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
@@ -24,12 +25,10 @@ class HomeFragment : Fragment() {
     private lateinit var rvCharts: RecyclerView
     private lateinit var progressBar: ProgressBar
     private lateinit var chartAdapter: ChartAdapter
-    
+
     private var tvEmpty: TextView? = null
 
-    private val repository by lazy {
-        (requireActivity().application as MelodyFlowApp).repository
-    }
+    private val viewModel: HomeViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -64,14 +63,29 @@ class HomeFragment : Fragment() {
         }
         rvCharts.adapter = chartAdapter
 
-        loadCharts()
+        observeViewModel()
+        viewModel.loadCharts()
     }
 
-    private fun loadCharts() {
-        showLoading()
-        val charts = repository.getCharts()
-        chartAdapter.submitList(charts)
-        hideLoading()
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                viewModel.state.collect { state ->
+                    if (state.isLoading) {
+                        showLoading()
+                    } else {
+                        if (state.charts.isNotEmpty()) {
+                            chartAdapter.submitList(state.charts)
+                        }
+                        hideLoading()
+                    }
+                    if (state.error != null && state.charts.isEmpty()) {
+                        tvEmpty?.text = "加载失败: ${state.error}"
+                        tvEmpty?.visibility = View.VISIBLE
+                    }
+                }
+            }
+        }
     }
 
     private fun showLoading() {

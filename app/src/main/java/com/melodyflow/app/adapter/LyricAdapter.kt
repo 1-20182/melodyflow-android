@@ -2,6 +2,8 @@ package com.melodyflow.app.adapter
 
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
+import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -26,17 +28,60 @@ class LyricAdapter : RecyclerView.Adapter<LyricAdapter.LyricViewHolder>() {
     private var alphaAnimator: ValueAnimator? = null
 
     companion object {
-        // Pre-computed colors
-        val COLOR_ACTIVE = Color.parseColor("#00FF7F")  // 亮绿色
-        val COLOR_PAST = Color.parseColor("#888888")
-        val COLOR_FUTURE = Color.parseColor("#CCCCCC")
-        val COLOR_ACTIVE_BG = Color.parseColor("#1A00FF7F")
+        // Light mode colors
+        val COLOR_ACTIVE_LIGHT = Color.parseColor("#00FF7F")  // Bright green
+        val COLOR_PAST_LIGHT = Color.parseColor("#888888")
+        val COLOR_FUTURE_LIGHT = Color.parseColor("#CCCCCC")
+        val COLOR_ACTIVE_BG_LIGHT = Color.parseColor("#1A00FF7F")
+
+        // Dark mode colors - use brighter/more vivid colors for dark backgrounds
+        val COLOR_ACTIVE_DARK = Color.parseColor("#4CDF7D")   // MD3 dark primary green
+        val COLOR_PAST_DARK = Color.parseColor("#B3B3B3")     // Lighter gray for readability
+        val COLOR_FUTURE_DARK = Color.parseColor("#737373")   // Medium gray
+        val COLOR_ACTIVE_BG_DARK = Color.parseColor("#284CDF7D") // Slightly more opaque highlight
+
         const val SIZE_ACTIVE = 18f
         const val SIZE_INACTIVE = 14f
         const val ALPHA_PAST = 0.6f
         const val ALPHA_FUTURE = 0.4f
         const val ANIM_DURATION = 300L
         val INTERPOLATOR = AccelerateDecelerateInterpolator()
+    }
+
+    /**
+     * Check if the system is currently in dark mode.
+     */
+    private fun isDarkMode(context: Context): Boolean {
+        val currentNightMode = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return currentNightMode == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /**
+     * Get the active (current line) color based on the current theme.
+     */
+    private fun getActiveColor(context: Context): Int {
+        return if (isDarkMode(context)) COLOR_ACTIVE_DARK else COLOR_ACTIVE_LIGHT
+    }
+
+    /**
+     * Get the past line color based on the current theme.
+     */
+    private fun getPastColor(context: Context): Int {
+        return if (isDarkMode(context)) COLOR_PAST_DARK else COLOR_PAST_LIGHT
+    }
+
+    /**
+     * Get the future line color based on the current theme.
+     */
+    private fun getFutureColor(context: Context): Int {
+        return if (isDarkMode(context)) COLOR_FUTURE_DARK else COLOR_FUTURE_LIGHT
+    }
+
+    /**
+     * Get the active line background color based on the current theme.
+     */
+    private fun getActiveBgColor(context: Context): Int {
+        return if (isDarkMode(context)) COLOR_ACTIVE_BG_DARK else COLOR_ACTIVE_BG_LIGHT
     }
 
     fun setLyrics(newLyrics: List<LyricLine>) {
@@ -98,17 +143,17 @@ class LyricAdapter : RecyclerView.Adapter<LyricAdapter.LyricViewHolder>() {
         val hasBackground: Boolean
 
         if (isCurrent) {
-            targetColor = COLOR_ACTIVE
+            targetColor = getActiveColor(context)
             targetSize = SIZE_ACTIVE
             targetAlpha = 1f
             hasBackground = true
         } else if (position < currentIndex) {
-            targetColor = COLOR_PAST
+            targetColor = getPastColor(context)
             targetSize = SIZE_INACTIVE
             targetAlpha = ALPHA_PAST
             hasBackground = false
         } else {
-            targetColor = COLOR_FUTURE
+            targetColor = getFutureColor(context)
             targetSize = SIZE_INACTIVE
             targetAlpha = ALPHA_FUTURE
             hasBackground = false
@@ -162,15 +207,15 @@ class LyricAdapter : RecyclerView.Adapter<LyricAdapter.LyricViewHolder>() {
         }
     }
 
-    private fun createRoundedBackground(context: android.content.Context): GradientDrawable {
+    private fun createRoundedBackground(context: Context): GradientDrawable {
         val radiusPx = dpToPx(8f, context)
         return GradientDrawable().apply {
-            setColor(COLOR_ACTIVE_BG)
+            setColor(getActiveBgColor(context))
             cornerRadius = radiusPx
         }
     }
 
-    private fun dpToPx(dp: Float, context: android.content.Context): Float {
+    private fun dpToPx(dp: Float, context: Context): Float {
         return TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics
         )
@@ -180,6 +225,7 @@ class LyricAdapter : RecyclerView.Adapter<LyricAdapter.LyricViewHolder>() {
         val tvLyric: TextView = itemView.findViewById(R.id.tvLyric)
 
         fun bind(lyric: LyricLine, isCurrent: Boolean) {
+            val context = itemView.context
             tvLyric.text = lyric.text
             tvLyric.elevation = 0f
             tvLyric.setTypeface(null, Typeface.NORMAL)
@@ -187,28 +233,28 @@ class LyricAdapter : RecyclerView.Adapter<LyricAdapter.LyricViewHolder>() {
             tvLyric.setPadding(0, 0, 0, 0)
 
             if (isCurrent) {
-                // Current lyric: green, bold, 18sp, green rounded background
-                tvLyric.setTextColor(COLOR_ACTIVE)
+                // Current lyric: active color, bold, 18sp, rounded background
+                tvLyric.setTextColor(getActiveColor(context))
                 tvLyric.textSize = SIZE_ACTIVE
                 tvLyric.setTypeface(null, Typeface.BOLD)
                 tvLyric.alpha = 1f
-                tvLyric.background = createRoundedBackground(itemView.context)
+                tvLyric.background = createRoundedBackground(context)
                 tvLyric.setPadding(
-                    dpToPx(8f, itemView.context).toInt(),
-                    dpToPx(4f, itemView.context).toInt(),
-                    dpToPx(8f, itemView.context).toInt(),
-                    dpToPx(4f, itemView.context).toInt()
+                    dpToPx(8f, context).toInt(),
+                    dpToPx(4f, context).toInt(),
+                    dpToPx(8f, context).toInt(),
+                    dpToPx(4f, context).toInt()
                 )
             } else {
                 val pos = adapterPosition
                 if (pos >= 0 && pos < this@LyricAdapter.currentIndex) {
-                    // Past lyric: gray, 14sp, alpha 0.6
-                    tvLyric.setTextColor(COLOR_PAST)
+                    // Past lyric: muted, 14sp, alpha 0.6
+                    tvLyric.setTextColor(getPastColor(context))
                     tvLyric.textSize = SIZE_INACTIVE
                     tvLyric.alpha = ALPHA_PAST
                 } else {
-                    // Future lyric: gray, 14sp, alpha 0.4
-                    tvLyric.setTextColor(COLOR_FUTURE)
+                    // Future lyric: dim, 14sp, alpha 0.4
+                    tvLyric.setTextColor(getFutureColor(context))
                     tvLyric.textSize = SIZE_INACTIVE
                     tvLyric.alpha = ALPHA_FUTURE
                 }

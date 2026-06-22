@@ -31,7 +31,19 @@ class SongAdapter(
     private val favoriteIds = mutableSetOf<String>()
     private val cachedIds = mutableSetOf<String>()
     private val downloadingIds = mutableSetOf<String>()
+    private val selectedIds = mutableSetOf<String>()
+    private var onItemLongClick: ((Song) -> Unit)? = null
     private val unplayableListener = { refreshUnplayable() }
+
+    fun setOnLongClickListener(listener: (Song) -> Unit) {
+        onItemLongClick = listener
+    }
+
+    fun setSelectedIds(ids: Set<String>) {
+        selectedIds.clear()
+        selectedIds.addAll(ids)
+        notifyDataSetChanged()
+    }
 
     fun setFavorites(ids: Set<String>) {
         val oldIds = favoriteIds.toSet()
@@ -100,6 +112,7 @@ class SongAdapter(
         private val tvArtist: TextView = itemView.findViewById(R.id.tvArtist)
         private val btnFavorite: ImageButton = itemView.findViewById(R.id.btnFavorite)
         private val ivCached: ImageView = itemView.findViewById(R.id.ivCached)
+        private val ivCacheStatus: ImageView? = itemView.findViewById(R.id.ivCacheStatus)
         private val btnCache: ImageButton = itemView.findViewById(R.id.btnCache)
 
         fun bind(song: Song, position: Int) {
@@ -134,6 +147,17 @@ class SongAdapter(
                 )
             } else {
                 ivCached.visibility = View.GONE
+            }
+
+            // Update cache status indicator (small icon next to title)
+            ivCacheStatus?.let { indicator ->
+                if (isCached) {
+                    indicator.visibility = View.VISIBLE
+                    indicator.setImageResource(R.drawable.ic_cache)
+                    indicator.setColorFilter(itemView.context.getColor(R.color.primary))
+                } else {
+                    indicator.visibility = View.GONE
+                }
             }
 
             // Update cache button state
@@ -178,6 +202,21 @@ class SongAdapter(
                     onItemClick(song, position)
                 }
             }
+            itemView.setOnLongClickListener {
+                onItemLongClick?.invoke(song)
+                true
+            }
+
+            // Show selected state
+            val isSelected = selectedIds.contains(song.id)
+            if (isSelected) {
+                itemView.alpha = 0.7f
+                itemView.setBackgroundColor(itemView.context.getColor(R.color.surface_variant))
+            } else {
+                itemView.alpha = 1.0f
+                itemView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
+
             btnFavorite.setOnClickListener {
                 animateButtonPress(btnFavorite)
                 onFavoriteClick?.invoke(song, !isFav)

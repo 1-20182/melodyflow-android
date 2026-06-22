@@ -86,6 +86,16 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent">
 
+            <!-- Cache status indicator -->
+            <ImageView
+                android:id="@+id/ivCacheStatus"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginEnd="@dimen/spacing_sm"
+                android:src="@drawable/ic_cache"
+                android:visibility="gone"
+                android:contentDescription="已缓存" />
+
             <!-- Cache indicator -->
             <ImageView
                 android:id="@+id/ivCached"

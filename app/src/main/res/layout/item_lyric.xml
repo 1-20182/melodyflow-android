@@ -16,7 +16,7 @@
         android:minHeight="@dimen/lyric_line_min_height"
         android:paddingHorizontal="@dimen/spacing_base"
         android:paddingVertical="@dimen/spacing_sm"
-        android:textColor="#CCCCCC"
+        android:textColor="@color/text_secondary"
         android:textSize="@dimen/lyric_text_size"
         tools:text="Lyric line here" />
 </LinearLayout>

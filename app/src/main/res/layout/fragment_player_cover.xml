@@ -25,10 +25,10 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_gravity="center"
-            app:cardBackgroundColor="#0A0A0A"
+            app:cardBackgroundColor="@color/vinyl_center_inner"
             app:cardCornerRadius="@dimen/cover_size_player"
             app:cardElevation="16dp"
-            app:strokeColor="#1A1A1A"
+            app:strokeColor="@color/vinyl_groove"
             app:strokeWidth="2dp">
             
             <View
@@ -61,10 +61,10 @@
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:layout_gravity="center"
-            app:cardBackgroundColor="#121212"
+            app:cardBackgroundColor="@color/vinyl_record_center"
             app:cardCornerRadius="16dp"
             app:cardElevation="4dp"
-            app:strokeColor="#0A0A0A"
+            app:strokeColor="@color/vinyl_center_inner"
             app:strokeWidth="1dp">
             
             <View
@@ -81,7 +81,7 @@
             android:layout_height="match_parent"
             android:layout_gravity="center"
             android:alpha="0"
-            android:background="#40000000"
+            android:background="@color/cover_play_overlay"
             android:clickable="true"
             android:focusable="true">
 

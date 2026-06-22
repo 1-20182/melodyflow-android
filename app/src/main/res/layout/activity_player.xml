@@ -114,7 +114,7 @@
                 app:cardBackgroundColor="@android:color/transparent"
                 app:cardCornerRadius="@dimen/cover_size_player"
                 app:cardElevation="16dp"
-                app:strokeColor="#1A1A1A"
+                app:strokeColor="@color/vinyl_groove"
                 app:strokeWidth="2dp">
 
                 <View
@@ -149,10 +149,10 @@
                 android:layout_width="32dp"
                 android:layout_height="32dp"
                 android:layout_gravity="center"
-                app:cardBackgroundColor="#121212"
+                app:cardBackgroundColor="@color/vinyl_record_center"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="4dp"
-                app:strokeColor="#0A0A0A"
+                app:strokeColor="@color/vinyl_center_inner"
                 app:strokeWidth="1dp">
 
                 <View
@@ -169,7 +169,7 @@
                 android:layout_height="match_parent"
                 android:layout_gravity="center"
                 android:alpha="0"
-                android:background="#40000000"
+                android:background="@color/cover_play_overlay"
                 android:clickable="true"
                 android:focusable="true"
                 android:visibility="gone">
@@ -428,17 +428,20 @@
                 android:layout_width="@dimen/spacing_lg"
                 android:layout_height="1dp" />
 
-            <!-- Play/Pause - Hero button -->
-            <ImageButton
+            <!-- Play/Pause - MD3 FAB -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/btnPlayPause"
-                android:layout_width="@dimen/control_button_play"
-                android:layout_height="@dimen/control_button_play"
-                android:background="@drawable/bg_circle_primary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/spacing_lg"
                 android:contentDescription="@string/player_play_pause"
-                android:elevation="8dp"
-                android:padding="18dp"
                 android:src="@drawable/ic_play"
-                app:tint="@color/background" />
+                app:backgroundTint="?attr/colorPrimary"
+                app:tint="?attr/colorOnPrimary"
+                app:fabCustomSize="64dp"
+                app:fabSize="normal"
+                app:elevation="6dp"
+                app:pressedTranslationZ="12dp" />
 
             <!-- Spacer -->
             <View

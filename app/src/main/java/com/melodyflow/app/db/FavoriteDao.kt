@@ -28,4 +28,13 @@ interface FavoriteDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM favorites WHERE id = :id)")
     suspend fun isFavoriteSync(id: String): Boolean
+
+    @Query("SELECT * FROM favorites ORDER BY addedAt DESC")
+    suspend fun getAllOnce(): List<FavoriteEntity>
+
+    @Query("SELECT COUNT(*) FROM favorites")
+    suspend fun getCount(): Int
+
+    @Query("SELECT id FROM favorites")
+    suspend fun getAllFavoriteIds(): List<String>
 }

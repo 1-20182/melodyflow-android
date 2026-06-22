@@ -13,13 +13,28 @@ android {
         applicationId = "com.melodyflow.app"
         minSdk = 21
         targetSdk = 34
-        versionCode = 9
-        versionName = "2.2.0"
+        versionCode = 10
+        versionName = "2.3.0"
         }
 
     testOptions {
         unitTests {
             isReturnDefaultValues = true
+        }
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        create("release") {
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
@@ -30,6 +45,7 @@ android {
         }
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -102,6 +118,9 @@ dependencies {
     // Kotlin Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Test dependencies
     testImplementation("junit:junit:4.13.2")

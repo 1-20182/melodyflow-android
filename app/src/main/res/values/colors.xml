@@ -109,4 +109,55 @@
 
     <!-- Launcher -->
     <color name="ic_launcher_background">#FF090909</color>
+
+    <!-- Widget -->
+    <color name="widget_accent_default">#FF5722</color>
+    <color name="widget_bg">#FFFFFFFF</color>
+    <color name="widget_border">#E0E0E0</color>
+
+    <!-- Seekbar -->
+    <color name="seekbar_progress">#1DB954</color>
+    <color name="seekbar_track">#33FFFFFF</color>
+    <color name="seekbar_thumb_color">#1DB954</color>
+
+    <!-- Bottom sheet handle -->
+    <color name="bottom_sheet_handle">#80FFFFFF</color>
+
+    <!-- Vinyl record -->
+    <color name="vinyl_groove">#1A1A1A</color>
+    <color name="vinyl_center_bg">#2A2A2A</color>
+    <color name="vinyl_center_inner">#0A0A0A</color>
+    <color name="vinyl_center_ring">#1A1A1A</color>
+    <color name="vinyl_center_hole">#000000</color>
+    <color name="vinyl_record_center">#121212</color>
+    <color name="vinyl_record_stroke">#1DB954</color>
+
+    <!-- Circle white (adapts to surface in dark mode) -->
+    <color name="circle_white_bg">#FFFFFFFF</color>
+
+    <!-- Player gradient overlay -->
+    <color name="player_gradient_start">#CC090909</color>
+    <color name="player_gradient_center">#E6090909</color>
+    <color name="player_gradient_end">#FF090909</color>
+
+    <!-- Cover play overlay -->
+    <color name="cover_play_overlay">#40000000</color>
+
+    <!-- MD3 Theme colors (Green-based palette) -->
+    <color name="md_theme_primary">#006D3B</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#6BFF96</color>
+    <color name="md_theme_onPrimaryContainer">#00210E</color>
+    <color name="md_theme_secondary">#4F6354</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+    <color name="md_theme_secondaryContainer">#D1E8D5</color>
+    <color name="md_theme_onSecondaryContainer">#0D1F13</color>
+    <color name="md_theme_tertiary">#3A6470</color>
+    <color name="md_theme_onTertiary">#FFFFFF</color>
+    <color name="md_theme_surface">#FCFDF7</color>
+    <color name="md_theme_onSurface">#1A1C19</color>
+    <color name="md_theme_surfaceVariant">#DDE5D9</color>
+    <color name="md_theme_onSurfaceVariant">#414941</color>
+    <color name="md_theme_outline">#717971</color>
+    <color name="md_theme_error">#BA1A1A</color>
 </resources>

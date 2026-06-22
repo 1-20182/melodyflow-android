@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.PlaybackParams
 import android.os.Build
@@ -31,6 +32,9 @@ import com.melodyflow.app.model.Song
 import com.melodyflow.app.model.UnplayableSongsHolder
 import com.melodyflow.app.ui.PlayerActivity
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.ConcurrentHashMap
 
 class MusicService : MediaBrowserServiceCompat() {
@@ -44,42 +48,89 @@ class MusicService : MediaBrowserServiceCompat() {
         const val ACTION_PREVIOUS = "action_previous"
         const val ACTION_STOP = "action_stop"
         const val ACTION_SONG_CHANGED = "action_song_changed"
+        const val ACTION_SET_SLEEP_TIMER = "action_set_sleep_timer"
+        const val ACTION_CANCEL_SLEEP_TIMER = "action_cancel_sleep_timer"
+        const val EXTRA_TIMER_MINUTES = "timer_minutes"
+        const val EXTRA_TIMER_MODE = "timer_mode"
+        const val EXTRA_TIMER_SONGS = "timer_songs"
         private const val RETRY_DELAY_MS = 30 * 60 * 1000L // 30 minutes before allowing retry
     }
 
-    interface PlaybackListener {
-        fun onSongChanged(song: Song?)
-        fun onPlayStateChanged(isPlaying: Boolean)
-        fun onError(message: String)
-        fun onSongCompleted() {}
-    }
-
-    private val playbackListeners = mutableListOf<PlaybackListener>()
-
-    fun addPlaybackListener(listener: PlaybackListener) {
-        if (!playbackListeners.contains(listener)) {
-            playbackListeners.add(listener)
-        }
-    }
-
-    fun removePlaybackListener(listener: PlaybackListener) {
-        playbackListeners.remove(listener)
+    enum class SleepTimerMode {
+        OFF,           // 未开启
+        FIXED_TIME,    // 固定时长（15/30/60分钟）
+        END_OF_SONG,   // 播放完当前歌曲
+        AFTER_SONGS    // 播放完指定数量的歌曲
     }
 
     private fun notifySongChanged(song: Song?) {
-        handler.post { playbackListeners.forEach { it.onSongChanged(song) } }
+        _currentSong.value = song
     }
 
     private fun notifyPlayStateChanged(isPlaying: Boolean) {
-        handler.post { playbackListeners.forEach { it.onPlayStateChanged(isPlaying) } }
+        _isPlaying.value = isPlaying
     }
 
     private fun notifyError(message: String) {
-        handler.post { playbackListeners.forEach { it.onError(message) } }
+        _errorMessage.value = message
     }
 
     private fun notifySongCompleted() {
-        handler.post { playbackListeners.forEach { it.onSongCompleted() } }
+        _songCompleted.value = System.currentTimeMillis()
+    }
+
+    // StateFlow-based state management
+    private val _currentSong = MutableStateFlow<Song?>(null)
+    val currentSongFlow: StateFlow<Song?> = _currentSong.asStateFlow()
+
+    private val _isPlaying = MutableStateFlow(false)
+    val isPlayingFlow: StateFlow<Boolean> = _isPlaying.asStateFlow()
+
+    private val _playbackProgress = MutableStateFlow(0L)
+    val playbackProgressFlow: StateFlow<Long> = _playbackProgress.asStateFlow()
+
+    private val _playbackDuration = MutableStateFlow(0L)
+    val playbackDurationFlow: StateFlow<Long> = _playbackDuration.asStateFlow()
+
+    private val _playMode = MutableStateFlow(PlayMode.SEQUENCE)
+    val playModeFlow: StateFlow<PlayMode> = _playMode.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessageFlow: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _songCompleted = MutableStateFlow(0L)
+    val songCompletedFlow: StateFlow<Long> = _songCompleted.asStateFlow()
+
+    private val _playlist = MutableStateFlow<List<Song>>(emptyList())
+    val playlistFlow: StateFlow<List<Song>> = _playlist.asStateFlow()
+
+    // Audio focus management
+    private var audioManager: AudioManager? = null
+    private var isAudioFocusGranted = false
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                // Permanent loss - pause playback
+                isAudioFocusGranted = false
+                pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // Temporary loss (e.g., notification sound) - pause
+                isAudioFocusGranted = false
+                pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                // Lower volume (duck) - we can keep playing but at lower volume
+                // For simplicity, just pause
+                pause()
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                // Regained focus - resume if was playing before
+                isAudioFocusGranted = true
+                // Don't auto-resume - let user control this
+            }
+        }
     }
 
     private lateinit var mediaSession: MediaSessionCompat
@@ -124,6 +175,14 @@ class MusicService : MediaBrowserServiceCompat() {
 
     private var playbackSpeed = 1.0f
 
+    // Sleep timer
+    private var sleepTimerHandler: Handler? = null
+    private var sleepTimerRunnable: Runnable? = null
+    private var sleepTimerEndTime: Long = 0
+    private var isSleepTimerActive = false
+    private var sleepTimerMode: SleepTimerMode = SleepTimerMode.OFF
+    private var remainingSongsCount: Int = 0
+
     enum class PlayMode {
         SEQUENCE, RANDOM, SINGLE, LOOP
     }
@@ -141,6 +200,7 @@ class MusicService : MediaBrowserServiceCompat() {
 
     override fun onCreate() {
         super.onCreate()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         cacheManager = CacheManager.getInstance(this)
         musicRepository = MusicRepository.getInstance(this)
         createNotificationChannel()
@@ -157,7 +217,9 @@ class MusicService : MediaBrowserServiceCompat() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(updateProgressRunnable)
+        cancelSleepTimer()
         serviceJob.cancel()
+        audioManager?.abandonAudioFocus(audioFocusChangeListener)
 
         // Stop and clear old player callbacks before releasing
         mediaPlayer?.let { oldPlayer ->
@@ -240,6 +302,21 @@ class MusicService : MediaBrowserServiceCompat() {
             ACTION_NEXT -> playNext()
             ACTION_PREVIOUS -> playPrevious()
             ACTION_STOP -> stopSelf()
+            ACTION_SET_SLEEP_TIMER -> {
+                val mode = intent.getStringExtra(EXTRA_TIMER_MODE) ?: "fixed_time"
+                when (mode) {
+                    "fixed_time" -> {
+                        val minutes = intent.getIntExtra(EXTRA_TIMER_MINUTES, 0)
+                        if (minutes > 0) setSleepTimer(minutes)
+                    }
+                    "end_of_song" -> setSleepTimerEndOfSong()
+                    "after_songs" -> {
+                        val songs = intent.getIntExtra(EXTRA_TIMER_SONGS, 1)
+                        setSleepTimerAfterSongs(songs)
+                    }
+                }
+            }
+            ACTION_CANCEL_SLEEP_TIMER -> cancelSleepTimer()
         }
         return START_STICKY
     }
@@ -248,16 +325,19 @@ class MusicService : MediaBrowserServiceCompat() {
         playlist.clear()
         playlist.addAll(songs)
         currentIndex = index.coerceIn(0, playlist.size - 1)
+        _playlist.value = playlist.toList()
     }
 
     fun addToPlaylist(song: Song) {
         if (!playlist.contains(song)) {
             playlist.add(song)
+            _playlist.value = playlist.toList()
         }
     }
 
     fun playSong(song: Song, forceIndex: Int = -1) {
         resetSkipGuard()
+        var playlistChanged = false
         if (forceIndex in playlist.indices) {
             currentIndex = forceIndex
         } else {
@@ -267,7 +347,11 @@ class MusicService : MediaBrowserServiceCompat() {
             } else {
                 playlist.add(song)
                 currentIndex = playlist.size - 1
+                playlistChanged = true
             }
+        }
+        if (playlistChanged) {
+            _playlist.value = playlist.toList()
         }
         // Notify UI immediately about song change before starting playback
         notifySongChanged(getCurrentSong())
@@ -477,9 +561,26 @@ class MusicService : MediaBrowserServiceCompat() {
         }
     }
 
+    private fun requestAudioFocus(): Boolean {
+        if (isAudioFocusGranted) return true
+        val result = audioManager?.requestAudioFocus(
+            audioFocusChangeListener,
+            AudioManager.STREAM_MUSIC,
+            AudioManager.AUDIOFOCUS_GAIN
+        ) ?: AudioManager.AUDIOFOCUS_REQUEST_FAILED
+        isAudioFocusGranted = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return isAudioFocusGranted
+    }
+
     private suspend fun startPlayback(song: Song, path: String, isCached: Boolean) = withContext(Dispatchers.Main) {
         // Capture the version at the start of playback
         val versionAtStart = playbackVersion
+
+        // Request audio focus before playing
+        if (!requestAudioFocus()) {
+            android.util.Log.w("MusicService", "Audio focus not granted, cannot play")
+            return@withContext
+        }
 
         try {
             notifySongChanged(song)
@@ -551,6 +652,15 @@ class MusicService : MediaBrowserServiceCompat() {
                     }
                     notifyPlayStateChanged(false)
                     notifySongCompleted()
+                    // Handle sleep timer logic (END_OF_SONG / AFTER_SONGS modes)
+                    val shouldPauseForSleepTimer = isSleepTimerActive &&
+                        (sleepTimerMode == SleepTimerMode.END_OF_SONG ||
+                            (sleepTimerMode == SleepTimerMode.AFTER_SONGS && remainingSongsCount <= 1))
+                    handleSleepTimerOnSongCompleted()
+                    // If sleep timer triggered and paused playback, don't play next
+                    if (shouldPauseForSleepTimer) {
+                        return@setOnCompletionListener
+                    }
                     when (playMode) {
                         PlayMode.SINGLE -> playCurrent()
                         else -> {
@@ -614,6 +724,10 @@ class MusicService : MediaBrowserServiceCompat() {
     }
 
     private fun play() {
+        if (!requestAudioFocus()) {
+            android.util.Log.w("MusicService", "Audio focus not granted, cannot resume playback")
+            return
+        }
         mediaPlayer?.let {
             if (!it.isPlaying) {
                 it.start()
@@ -677,7 +791,7 @@ class MusicService : MediaBrowserServiceCompat() {
         updatePlaybackState(if (mediaPlayer?.isPlaying == true) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED)
     }
 
-    fun setPlayMode(mode: PlayMode) { playMode = mode }
+    fun setPlayMode(mode: PlayMode) { playMode = mode; _playMode.value = mode }
     fun getPlayMode(): PlayMode = playMode
     fun getCurrentSong(): Song? = if (playlist.isNotEmpty() && currentIndex < playlist.size) playlist[currentIndex] else null
     fun getPlaylist(): List<Song> = playlist.toList()
@@ -724,6 +838,83 @@ class MusicService : MediaBrowserServiceCompat() {
     fun getSpeed(): Float = playbackSpeed
 
     fun getAudioSessionId(): Int = mediaPlayer?.audioSessionId ?: 0
+
+    // --- Sleep Timer ---
+
+    fun setSleepTimer(minutes: Int) {
+        android.util.Log.d("MusicService", "setSleepTimer: minutes=$minutes")
+        cancelSleepTimer()
+
+        sleepTimerMode = SleepTimerMode.FIXED_TIME
+        sleepTimerHandler = Handler(Looper.getMainLooper())
+        sleepTimerEndTime = System.currentTimeMillis() + (minutes * 60 * 1000L)
+        isSleepTimerActive = true
+
+        sleepTimerRunnable = Runnable {
+            android.util.Log.d("MusicService", "sleepTimerRunnable: timer triggered!")
+            pause()
+            cancelSleepTimer()
+        }
+
+        sleepTimerHandler?.postDelayed(sleepTimerRunnable!!, minutes * 60 * 1000L)
+        android.util.Log.d("MusicService", "setSleepTimer: timer scheduled for $minutes minutes")
+    }
+
+    fun setSleepTimerEndOfSong() {
+        android.util.Log.d("MusicService", "setSleepTimerEndOfSong")
+        cancelSleepTimer()
+        sleepTimerMode = SleepTimerMode.END_OF_SONG
+        isSleepTimerActive = true
+        remainingSongsCount = 0
+    }
+
+    fun setSleepTimerAfterSongs(songCount: Int) {
+        android.util.Log.d("MusicService", "setSleepTimerAfterSongs: songCount=$songCount")
+        cancelSleepTimer()
+        sleepTimerMode = SleepTimerMode.AFTER_SONGS
+        isSleepTimerActive = true
+        remainingSongsCount = songCount
+    }
+
+    fun cancelSleepTimer() {
+        android.util.Log.d("MusicService", "cancelSleepTimer")
+        sleepTimerRunnable?.let { sleepTimerHandler?.removeCallbacks(it) }
+        sleepTimerHandler = null
+        sleepTimerRunnable = null
+        isSleepTimerActive = false
+        sleepTimerEndTime = 0
+        sleepTimerMode = SleepTimerMode.OFF
+        remainingSongsCount = 0
+    }
+
+    fun isSleepTimerActive(): Boolean = isSleepTimerActive
+    fun getSleepTimerMode(): SleepTimerMode = sleepTimerMode
+    fun getSleepTimerEndTime(): Long = sleepTimerEndTime
+    fun getRemainingSongsCount(): Int = remainingSongsCount
+
+    private fun handleSleepTimerOnSongCompleted() {
+        android.util.Log.d("MusicService", "handleSleepTimerOnSongCompleted: sleepTimerMode=$sleepTimerMode, remainingSongsCount=$remainingSongsCount")
+        if (!isSleepTimerActive) return
+
+        when (sleepTimerMode) {
+            SleepTimerMode.END_OF_SONG -> {
+                android.util.Log.d("MusicService", "handleSleepTimerOnSongCompleted: END_OF_SONG mode, pausing")
+                pause()
+                cancelSleepTimer()
+            }
+            SleepTimerMode.AFTER_SONGS -> {
+                remainingSongsCount--
+                android.util.Log.d("MusicService", "handleSleepTimerOnSongCompleted: AFTER_SONGS mode, remaining=$remainingSongsCount")
+                if (remainingSongsCount <= 0) {
+                    pause()
+                    cancelSleepTimer()
+                }
+            }
+            else -> {
+                // FIXED_TIME mode, do nothing here (handled by Handler)
+            }
+        }
+    }
 
     private fun updateMetadata(song: Song) {
         val metadata = MediaMetadataCompat.Builder()
@@ -775,6 +966,11 @@ class MusicService : MediaBrowserServiceCompat() {
 
     private fun updatePlaybackState(state: Int) {
         val position = mediaPlayer?.currentPosition?.toLong() ?: 0
+        _playbackProgress.value = position
+        val duration = mediaPlayer?.duration?.toLong() ?: 0
+        if (duration > 0) {
+            _playbackDuration.value = duration
+        }
         val playbackState = PlaybackStateCompat.Builder()
             .setState(state, position, 1.0f)
             .setActions(

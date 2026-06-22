@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import com.google.android.material.color.DynamicColors
 import com.melodyflow.app.data.CacheManager
 import com.melodyflow.app.data.MusicRepository
 import com.melodyflow.app.model.UnplayableSongsHolder
@@ -21,6 +22,9 @@ class MelodyFlowApp : Application() {
         instance = this
         Log.i(TAG, "MelodyFlow 初始化开始")
         Log.i(TAG, "版本: ${BuildConfig.VERSION_NAME ?: "unknown"}")
+
+        // Enable Material You dynamic colors on Android 12+
+        DynamicColors.applyToActivitiesIfAvailable(this)
 
         // Initialize repository (triggers lazy init)
         try {

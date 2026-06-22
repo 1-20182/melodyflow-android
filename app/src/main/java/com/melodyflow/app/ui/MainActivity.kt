@@ -11,11 +11,14 @@ import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
@@ -24,18 +27,25 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.navigationrail.NavigationRailView
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.melodyflow.app.BuildConfig
 import com.melodyflow.app.R
 import com.melodyflow.app.adapter.MainPagerAdapter
 import com.melodyflow.app.adapter.PlaylistAdapter
+import com.melodyflow.app.data.BackupManager
+import com.melodyflow.app.data.LocalScanService
 import com.melodyflow.app.model.Song
 import com.melodyflow.app.service.MusicService
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -87,20 +97,34 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Keep a reference to the listener so it can be properly removed
-    private val miniPlayerListener = object : MusicService.PlaybackListener {
-        override fun onSongChanged(song: Song?) {
-            updateMiniPlayer()
-            updatePlaylistHighlight()
-        }
-        override fun onPlayStateChanged(isPlaying: Boolean) {
-            updateMiniPlayer()
-            if (isPlaying) {
-                startMiniPlayerProgressUpdate()
+    // StateFlow observation job references
+    private var stateFlowObserverJob: kotlinx.coroutines.Job? = null
+
+    private fun observeMusicServiceStateFlow() {
+        stateFlowObserverJob?.cancel()
+        stateFlowObserverJob = lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                launch {
+                    musicService?.currentSongFlow?.collect { song ->
+                        updateMiniPlayer()
+                        updatePlaylistData()
+                        updatePlaylistHighlight()
+                    }
+                }
+                launch {
+                    musicService?.isPlayingFlow?.collect { isPlaying ->
+                        updateMiniPlayer()
+                        if (isPlaying) {
+                            startMiniPlayerProgressUpdate()
+                        }
+                    }
+                }
+                launch {
+                    musicService?.playlistFlow?.collect {
+                        updatePlaylistData()
+                    }
+                }
             }
-        }
-        override fun onError(message: String) {
-            // Mini player doesn't need to show errors
         }
     }
 
@@ -108,8 +132,8 @@ class MainActivity : AppCompatActivity() {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             musicService = (binder as? MusicService.LocalBinder)?.getService()
             serviceBound = true
-            // Add playback listener for real-time updates
-            musicService?.addPlaybackListener(miniPlayerListener)
+            // Observe StateFlow for real-time updates
+            observeMusicServiceStateFlow()
             updateMiniPlayer()
             initPlaylistRecyclerView()
             updatePlaylistData()
@@ -117,7 +141,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            musicService?.removePlaybackListener(miniPlayerListener)
+            stateFlowObserverJob?.cancel()
             musicService = null
             serviceBound = false
         }
@@ -125,10 +149,45 @@ class MainActivity : AppCompatActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
+    ) { _ ->
+        // Whether notification permission is granted or not, start music service
+        startMusicService()
+    }
+
+    // Storage permission launcher for Android 10 and below
+    private val storagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val writeGranted = permissions[Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false
+        val readGranted = permissions[Manifest.permission.READ_EXTERNAL_STORAGE] ?: false
+        if (writeGranted || readGranted) {
+            onStoragePermissionGranted()
+        } else {
+            // Permission denied, still start music service but skip local scan
             startMusicService()
         }
+    }
+
+    // Activity result launcher for MANAGE_EXTERNAL_STORAGE on Android 11+
+    private val manageStorageLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { _ ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (Environment.isExternalStorageManager()) {
+                onStoragePermissionGranted()
+            } else {
+                // Permission denied, still start music service but skip local scan
+                startMusicService()
+            }
+        }
+    }
+
+    companion object {
+        private const val REQUEST_STORAGE_PERMISSION = 1001
+
+        // Static flag to ensure incremental scan runs only once per app session (process lifetime)
+        @Volatile
+        private var hasScannedThisSession = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -214,9 +273,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Update background for dark/light mode switch
+        com.melodyflow.app.util.BackgroundManager.updateForDarkMode(this)
         // Handle landscape: bottom nav may be replaced by Navigation Rail in layout
         // Update mini player visibility for landscape
         updateMiniPlayer()
+        // Re-initialize playlist RecyclerView for landscape layout
+        initPlaylistRecyclerView()
+        updatePlaylistData()
+        updatePlaylistHighlight()
     }
 
     override fun onResume() {
@@ -232,7 +297,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopMiniPlayerProgressUpdate()
-        musicService?.removePlaybackListener(miniPlayerListener)
+        stateFlowObserverJob?.cancel()
         if (serviceBound) {
             unbindService(serviceConnection)
             serviceBound = false
@@ -631,11 +696,100 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
+        // Step 1: Check and request storage permission first
+        checkStoragePermission()
+    }
+
+    private fun checkStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Android 11+: Use MANAGE_EXTERNAL_STORAGE
+            if (Environment.isExternalStorageManager()) {
+                onStoragePermissionGranted()
+            } else {
+                // Show rationale dialog before opening settings
+                AlertDialog.Builder(this)
+                    .setTitle("需要存储权限")
+                    .setMessage("MelodyFlow 需要访问存储权限来扫描本地音乐文件和管理备份。请在设置中授予\"所有文件访问\"权限。")
+                    .setPositiveButton("前往设置") { _, _ ->
+                        try {
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            manageStorageLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            // Fallback to generic settings
+                            val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                            manageStorageLauncher.launch(intent)
+                        }
+                    }
+                    .setNegativeButton("稍后") { _, _ ->
+                        // User declined, still start music service
+                        startMusicService()
+                    }
+                    .setCancelable(false)
+                    .show()
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Android 6-10: Use runtime permissions
+            val writeGranted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+            val readGranted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (writeGranted && readGranted) {
+                onStoragePermissionGranted()
+            } else {
+                if (ActivityCompat.shouldShowRequestPermissionRationale(
+                        this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+                    ) || ActivityCompat.shouldShowRequestPermissionRationale(
+                        this, Manifest.permission.READ_EXTERNAL_STORAGE
+                    )
+                ) {
+                    // Show rationale
+                    AlertDialog.Builder(this)
+                        .setTitle("需要存储权限")
+                        .setMessage("MelodyFlow 需要存储权限来扫描本地音乐文件和管理备份。")
+                        .setPositiveButton("授权") { _, _ ->
+                            storagePermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                                    Manifest.permission.READ_EXTERNAL_STORAGE
+                                )
+                            )
+                        }
+                        .setNegativeButton("稍后") { _, _ ->
+                            startMusicService()
+                        }
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    // First time request
+                    storagePermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        )
+                    )
+                }
+            }
+        } else {
+            // Below Android 6: permissions granted at install time
+            onStoragePermissionGranted()
+        }
+    }
+
+    /**
+     * Called when storage permission is granted.
+     * Triggers: notification permission check -> music service start -> auto scan -> backup check
+     */
+    private fun onStoragePermissionGranted() {
+        // Check notification permission (Android 13+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             when {
                 ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
+                    this, Manifest.permission.POST_NOTIFICATIONS
                 ) == PackageManager.PERMISSION_GRANTED -> {
                     startMusicService()
                 }
@@ -645,6 +799,132 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             startMusicService()
+        }
+
+        // Trigger incremental scan in background (only once per session)
+        triggerIncrementalScan()
+
+        // Check for backup restore opportunity
+        checkBackupAndRestore()
+    }
+
+    /**
+     * Trigger incremental scan on startup, only once per app session.
+     * Uses a static flag (not SharedPreferences) so it resets when the app process is killed.
+     */
+    private fun triggerIncrementalScan() {
+        if (hasScannedThisSession) return
+
+        // Mark as scanned for this session
+        hasScannedThisSession = true
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val scanService = LocalScanService.getInstance(this@MainActivity)
+                val count = scanService.incrementalScan()
+                if (count > 0) {
+                    android.util.Log.i("MainActivity", "Incremental scan found $count new songs")
+                } else {
+                    android.util.Log.i("MainActivity", "Incremental scan: no new songs found")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Incremental scan failed", e)
+            }
+        }
+    }
+
+    /**
+     * Check if there is a backup file and the database is empty.
+     * If so, show a dialog asking if the user wants to restore from backup.
+     */
+    private fun checkBackupAndRestore() {
+        lifecycleScope.launch {
+            try {
+                val backupManager = BackupManager.getInstance(this@MainActivity)
+                val hasBackup = withContext(Dispatchers.IO) { backupManager.hasBackupFile() }
+                if (!hasBackup) return@launch
+
+                val isDbEmpty = withContext(Dispatchers.IO) { backupManager.isDatabaseEmpty() }
+                if (!isDbEmpty) return@launch
+
+                // Both conditions met: backup exists and database is empty
+                val backupFile = withContext(Dispatchers.IO) { backupManager.getLatestBackupFile() }
+                    ?: return@launch
+
+                val preview = withContext(Dispatchers.IO) { backupManager.previewBackup(backupFile) }
+                    ?: return@launch
+
+                // Build preview info text
+                val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                val dateStr = dateFormat.format(java.util.Date(preview.exportDate))
+                val infoBuilder = StringBuilder()
+                infoBuilder.appendLine("备份时间: $dateStr")
+                if (preview.favoriteCount > 0) infoBuilder.appendLine("收藏: ${preview.favoriteCount} 首")
+                if (preview.historyCount > 0) infoBuilder.appendLine("历史: ${preview.historyCount} 条")
+                if (preview.calendarEventCount > 0) infoBuilder.appendLine("日历事件: ${preview.calendarEventCount} 个")
+                if (preview.diaryCount > 0) infoBuilder.appendLine("日记: ${preview.diaryCount} 篇")
+                if (preview.hasAiConfig) infoBuilder.appendLine("AI 配置: 已包含")
+
+                // Show restore dialog with custom view
+                val dialogView = layoutInflater.inflate(R.layout.dialog_backup_restore, null)
+                val tvBackupInfo = dialogView.findViewById<TextView>(R.id.tvBackupInfo)
+                val progressBar = dialogView.findViewById<android.widget.ProgressBar>(R.id.progressBar)
+                val tvStatus = dialogView.findViewById<TextView>(R.id.tvStatus)
+
+                tvBackupInfo?.text = infoBuilder.toString().trim()
+                progressBar?.visibility = View.GONE
+                tvStatus?.visibility = View.GONE
+
+                val dialog = AlertDialog.Builder(this@MainActivity)
+                    .setTitle("检测到备份数据")
+                    .setView(dialogView)
+                    .setPositiveButton("恢复", null)
+                    .setNegativeButton("跳过", null)
+                    .setCancelable(false)
+                    .create()
+
+                // Override positive button click to prevent auto-dismiss
+                dialog.setOnShowListener {
+                    val positiveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                    positiveButton.setOnClickListener {
+                        // Disable buttons during restore
+                        positiveButton.isEnabled = false
+                        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).isEnabled = false
+
+                        // Show progress
+                        progressBar?.visibility = View.VISIBLE
+                        tvStatus?.visibility = View.VISIBLE
+                        tvStatus?.text = "正在恢复数据..."
+
+                        lifecycleScope.launch {
+                            val success = withContext(Dispatchers.IO) {
+                                backupManager.importBackup(
+                                    backupFile,
+                                    BackupManager.ImportOptions()
+                                )
+                            }
+                            if (success) {
+                                android.widget.Toast.makeText(
+                                    this@MainActivity,
+                                    "数据恢复成功",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                android.widget.Toast.makeText(
+                                    this@MainActivity,
+                                    "数据恢复失败",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                            dialog.dismiss()
+                        }
+                    }
+                }
+
+                dialog.show()
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Backup check failed", e)
+            }
         }
     }
 
@@ -718,7 +998,12 @@ class MainActivity : AppCompatActivity() {
             playlistAdapter = PlaylistAdapter(
                 currentSongId = musicService?.getCurrentSong()?.id,
                 onItemClick = { song ->
-                    musicService?.playSong(song)
+                    val service = musicService
+                    if (service != null) {
+                        service.playSong(song)
+                    } else {
+                        android.widget.Toast.makeText(this, "播放服务未就绪", android.widget.Toast.LENGTH_SHORT).show()
+                    }
                 }
             )
             recyclerView.adapter = playlistAdapter
@@ -736,17 +1021,8 @@ class MainActivity : AppCompatActivity() {
     // 更新播放队列高亮
     private fun updatePlaylistHighlight() {
         val currentSong = musicService?.getCurrentSong()
-        playlistAdapter?.let { adapter ->
-            // 重新创建适配器以更新当前播放歌曲高亮
-            val newAdapter = PlaylistAdapter(
-                currentSongId = currentSong?.id,
-                onItemClick = { song ->
-                    musicService?.playSong(song)
-                }
-            )
-            rvPlaylist?.adapter = newAdapter
-            playlistAdapter = newAdapter
-            updatePlaylistData()
-        }
+        val playlist = musicService?.getPlaylist() ?: emptyList()
+        val position = playlist.indexOfFirst { it.id == currentSong?.id }
+        playlistAdapter?.updateHighlight(position)
     }
 }

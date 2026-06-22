@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MD3 Theme colors - Dark mode overrides (Green-based palette) -->
+    <color name="md_theme_primary">#4CDF7D</color>
+    <color name="md_theme_onPrimary">#00391B</color>
+    <color name="md_theme_primaryContainer">#005228</color>
+    <color name="md_theme_onPrimaryContainer">#6BFF96</color>
+    <color name="md_theme_secondary">#B5CCBA</color>
+    <color name="md_theme_onSecondary">#213528</color>
+    <color name="md_theme_secondaryContainer">#374B3E</color>
+    <color name="md_theme_onSecondaryContainer">#D1E8D5</color>
+    <color name="md_theme_tertiary">#A2CCDA</color>
+    <color name="md_theme_onTertiary">#023640</color>
+    <color name="md_theme_surface">#1A1C19</color>
+    <color name="md_theme_onSurface">#E2E3DD</color>
+    <color name="md_theme_surfaceVariant">#414941</color>
+    <color name="md_theme_onSurfaceVariant">#C1C9BD</color>
+    <color name="md_theme_outline">#8B9389</color>
+    <color name="md_theme_error">#FFB4AB</color>
+
+    <!-- Widget dark mode -->
+    <color name="widget_bg">#FF1A1A1A</color>
+    <color name="widget_border">#FF333333</color>
+
+    <!-- Seekbar dark mode - slightly brighter track for visibility -->
+    <color name="seekbar_track">#33FFFFFF</color>
+    <color name="seekbar_thumb_color">#4CDF7D</color>
+
+    <!-- Bottom sheet handle dark mode -->
+    <color name="bottom_sheet_handle">#80FFFFFF</color>
+
+    <!-- Vinyl record dark mode - lighter grooves for visibility on dark background -->
+    <color name="vinyl_groove">#2A2A2A</color>
+    <color name="vinyl_center_bg">#3A3A3A</color>
+    <color name="vinyl_center_inner">#1A1A1A</color>
+    <color name="vinyl_center_ring">#2A2A2A</color>
+    <color name="vinyl_center_hole">#000000</color>
+    <color name="vinyl_record_center">#1A1A1A</color>
+    <color name="vinyl_record_stroke">#4CDF7D</color>
+
+    <!-- Circle white adapts to dark surface -->
+    <color name="circle_white_bg">#FF2A2A2A</color>
+
+    <!-- Player gradient overlay - darker in dark mode -->
+    <color name="player_gradient_start">#CC000000</color>
+    <color name="player_gradient_center">#E6000000</color>
+    <color name="player_gradient_end">#FF000000</color>
+
+    <!-- Cover play overlay - slightly more opaque in dark mode -->
+    <color name="cover_play_overlay">#60000000</color>
+</resources>

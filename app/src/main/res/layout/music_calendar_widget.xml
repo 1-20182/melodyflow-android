@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:background="@drawable/widget_bg">
+
+    <!-- Month Title Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/widget_prev_month"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_media_previous"
+            android:background="@android:color/transparent"
+            android:contentDescription="上月" />
+
+        <TextView
+            android:id="@+id/widget_month_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="?android:attr/textColorPrimary" />
+
+        <ImageButton
+            android:id="@+id/widget_next_month"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@android:drawable/ic_media_next"
+            android:background="@android:color/transparent"
+            android:contentDescription="下月" />
+    </LinearLayout>
+
+    <!-- Weekday Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="horizontal"
+        android:weightSum="7">
+
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="日" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="一" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="二" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="三" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="四" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="五" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="六" android:textSize="12sp" android:textColor="?android:attr/textColorSecondary" />
+    </LinearLayout>
+
+    <!-- Date Grid (42 cells for up to 6 weeks) -->
+    <GridLayout
+        android:id="@+id/widget_date_grid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:columnCount="7"
+        android:rowCount="6" />
+
+    <!-- Today Button -->
+    <Button
+        android:id="@+id/widget_today_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="今日"
+        android:textSize="12sp"
+        style="@android:style/Widget.Material.Button.Borderless" />
+
+</LinearLayout>

@@ -6,6 +6,9 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.melodyflow.app.db.*
 import com.melodyflow.app.model.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -47,6 +50,19 @@ class MusicRepository private constructor(context: Context) {
     private val userConversationDao = db.userConversationDao()
     private val cacheManager = CacheManager.getInstance(context)
     private val gson = Gson()
+
+    // ============================================================
+    // Pending playlist state (replaces SongListHolder static variable)
+    // ============================================================
+
+    private val _pendingPlaylist = MutableStateFlow<List<Song>?>(null)
+    val pendingPlaylistFlow: StateFlow<List<Song>?> = _pendingPlaylist.asStateFlow()
+
+    fun setPendingPlaylist(songs: List<Song>?) {
+        _pendingPlaylist.value = songs
+    }
+
+    fun getPendingPlaylist(): List<Song>? = _pendingPlaylist.value
 
     init {
         MusicSourceManager.init(context)
@@ -704,7 +720,6 @@ class MusicRepository private constructor(context: Context) {
 
     suspend fun removeFavorite(songId: String) {
         favoriteDao.deleteById(songId)
-        cacheManager.removeCache(songId)
     }
 
     fun isFavorite(songId: String): Flow<Boolean> = favoriteDao.isFavorite(songId)
@@ -724,6 +739,7 @@ class MusicRepository private constructor(context: Context) {
     fun getHistory(): Flow<List<HistoryEntity>> = historyDao.getAll()
 
     suspend fun addToHistory(song: Song) {
+        val now = System.currentTimeMillis()
         historyDao.insert(
             HistoryEntity(
                 id = song.id,
@@ -731,9 +747,15 @@ class MusicRepository private constructor(context: Context) {
                 artist = song.artist,
                 album = song.album,
                 pic = song.pic,
-                url = song.url
+                url = song.url,
+                playedAt = now,
+                playCount = 1,
+                lastPlayedAt = now
             )
         )
+        // 如果歌曲已存在（insert 被 IGNORE），则更新播放统计
+        historyDao.updatePlayStats(song.id, now)
+        historyDao.trimOldRecords()
     }
 
     suspend fun clearHistory() {

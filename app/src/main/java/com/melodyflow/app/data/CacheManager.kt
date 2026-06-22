@@ -3,6 +3,7 @@ package com.melodyflow.app.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.os.Environment
 import android.util.LruCache
 import com.google.gson.Gson
@@ -12,11 +13,13 @@ import com.melodyflow.app.db.CacheEntity
 import com.melodyflow.app.db.MusicDatabase
 import com.melodyflow.app.model.Song
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,9 +33,10 @@ import java.util.concurrent.TimeUnit
 class CacheManager private constructor(context: Context) {
 
     private val cacheDao: CacheDao = MusicDatabase.getInstance(context).cacheDao()
-    private val cacheDir = File(context.cacheDir, "music_cache")
-    private val picCacheDir = File(context.cacheDir, "pic_cache")
-    private val lrcCacheDir = File(context.cacheDir, "lrc_cache")
+    private val externalBaseDir = File(Environment.getExternalStorageDirectory(), "MelodyFlow")
+    private val cacheDir = File(externalBaseDir, "cache/music")
+    private val picCacheDir = File(externalBaseDir, "cache/pic")
+    private val lrcCacheDir = File(externalBaseDir, "cache/lrc")
     private val appContext = context.applicationContext
 
     private val client = OkHttpClient.Builder()
@@ -77,6 +81,20 @@ class CacheManager private constructor(context: Context) {
         picCacheDir.mkdirs()
         lrcCacheDir.mkdirs()
 
+        // Check if migration from internal cache is needed
+        val prefs = appContext.getSharedPreferences("melodyflow_cache", 0)
+        if (!prefs.getBoolean("migrated_to_external", false)) {
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    migrateFromInternalCache()
+                    prefs.edit().putBoolean("migrated_to_external", true).apply()
+                } catch (e: Exception) {
+                    // Migration failed, continue with external dir anyway
+                    android.util.Log.e("CacheManager", "Migration from internal cache failed", e)
+                }
+            }
+        }
+
         // Use 1/8 of available app memory for bitmap LRU cache
         val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt() // in KB
         val cacheSize = maxMemory / 8
@@ -85,6 +103,139 @@ class CacheManager private constructor(context: Context) {
                 // Return size in KB
                 return bitmap.allocationByteCount / 1024
             }
+        }
+    }
+
+    // ============================================================
+    // Storage permission & migration
+    // ============================================================
+
+    /**
+     * Check if the app has storage permission to write to external public directory.
+     * On Android R+ (API 30+), MANAGE_EXTERNAL_STORAGE is required.
+     * On older versions, READ/WRITE_EXTERNAL_STORAGE is sufficient.
+     */
+    fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            true // For older versions, READ/WRITE_EXTERNAL_STORAGE is sufficient
+        }
+    }
+
+    /**
+     * Migrate cache files from old internal storage to external public directory.
+     * Moves music, picture, and lyrics files, then updates DB records with new paths.
+     * Returns true if any files were migrated.
+     */
+    suspend fun migrateFromInternalCache(): Boolean {
+        val oldMusicDir = File(appContext.cacheDir, "music_cache")
+        val oldPicDir = File(appContext.cacheDir, "pic_cache")
+        val oldLrcDir = File(appContext.cacheDir, "lrc_cache")
+
+        var migrated = false
+
+        // Migrate music files
+        migrated = migrateDirectory(oldMusicDir, cacheDir) || migrated
+
+        // Migrate picture files
+        migrated = migrateDirectory(oldPicDir, picCacheDir) || migrated
+
+        // Migrate lyrics files
+        migrated = migrateDirectory(oldLrcDir, lrcCacheDir) || migrated
+
+        // Update DB records with new file paths
+        if (migrated) {
+            updateDbPathsAfterMigration()
+        }
+
+        return migrated
+    }
+
+    /**
+     * Migrate files from an old directory to a new directory.
+     * Moves each file individually; skips if target already exists.
+     * Deletes the old directory if it becomes empty.
+     */
+    private fun migrateDirectory(oldDir: File, newDir: File): Boolean {
+        if (!oldDir.exists()) return false
+
+        var migrated = false
+        newDir.mkdirs()
+
+        oldDir.listFiles()?.forEach { file ->
+            val target = File(newDir, file.name)
+            if (!target.exists()) {
+                try {
+                    file.copyTo(target, overwrite = false)
+                    if (target.exists()) {
+                        file.delete()
+                        migrated = true
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.w("CacheManager", "Failed to migrate ${file.name}", e)
+                }
+            } else {
+                // Target already exists, just delete the old file
+                file.delete()
+                migrated = true
+            }
+        }
+
+        // Delete old directory if empty
+        if (oldDir.listFiles()?.isEmpty() != false) {
+            oldDir.delete()
+        }
+
+        return migrated
+    }
+
+    /**
+     * Update database records to point to the new external storage paths
+     * after migration from internal cache.
+     */
+    private suspend fun updateDbPathsAfterMigration() {
+        try {
+            val allCaches = cacheDao.getAllOnce()
+            for (cache in allCaches) {
+                var updated = false
+                var newFilePath = cache.filePath
+                var newPic = cache.pic
+                var newLrc = cache.lrc
+
+                // Update music file path
+                if (cache.filePath.contains("music_cache")) {
+                    val fileName = File(cache.filePath).name
+                    newFilePath = File(cacheDir, fileName).absolutePath
+                    updated = true
+                }
+
+                // Update picture path
+                if (cache.pic.contains("pic_cache")) {
+                    val fileName = File(cache.pic).name
+                    newPic = File(picCacheDir, fileName).absolutePath
+                    updated = true
+                }
+
+                // Update lyrics path
+                if (cache.lrc.contains("lrc_cache")) {
+                    val fileName = File(cache.lrc).name
+                    newLrc = File(lrcCacheDir, fileName).absolutePath
+                    updated = true
+                }
+
+                if (updated) {
+                    cacheDao.insert(
+                        cache.copy(
+                            filePath = newFilePath,
+                            pic = newPic,
+                            lrc = newLrc
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("CacheManager", "Failed to update DB paths after migration", e)
         }
     }
 
@@ -194,7 +345,23 @@ class CacheManager private constructor(context: Context) {
                     return@withContext true
                 }
 
-                val url = song.url ?: return@withContext false
+                // If URL is null, try to resolve it via MusicRepository
+                var url = song.url
+                if (url.isNullOrBlank()) {
+                    android.util.Log.i("CacheManager", "Song ${song.id} has no URL, trying to resolve via API")
+                    try {
+                        val repository = MusicRepository.getInstance(appContext)
+                        url = repository.getSongUrl(song.id)
+                        if (url.isNullOrBlank()) {
+                            android.util.Log.w("CacheManager", "Could not resolve URL for song ${song.id}, skipping")
+                            return@withContext false
+                        }
+                        android.util.Log.i("CacheManager", "Resolved URL for song ${song.id}: $url")
+                    } catch (e: Exception) {
+                        android.util.Log.w("CacheManager", "Failed to resolve URL for song ${song.id}: ${e.message}")
+                        return@withContext false
+                    }
+                }
                 android.util.Log.i("CacheManager", "Starting download for ${song.name} (ID: ${song.id})")
                 android.util.Log.i("CacheManager", "URL: $url")
                 
@@ -322,6 +489,10 @@ class CacheManager private constructor(context: Context) {
                     )
                 )
                 android.util.Log.i("CacheManager", "Cache entry created for ${song.id}")
+
+                // Enforce cache limit after adding new cache entry
+                enforceCacheLimit()
+
                 true
             } catch (e: Exception) {
                 android.util.Log.e("CacheManager", "Failed to save file for ${song.id}", e)
@@ -454,12 +625,30 @@ class CacheManager private constructor(context: Context) {
             try {
                 val allCachesList = cacheDao.getAll().first()
                 coroutineScope {
-                    // Remove files whose DB entry is gone
+                    // Remove music_cache files whose DB entry is gone
                     val dbSongIds = allCachesList.map { it.songId }.toSet()
                     val filesOnDisk = cacheDir.listFiles() ?: emptyArray()
                     filesOnDisk.filter { file ->
                         val songId = file.nameWithoutExtension
                         songId !in dbSongIds
+                    }.map { file ->
+                        async { file.delete() }
+                    }.awaitAll()
+
+                    // Remove pic_cache orphaned files (no DB entry references them via pic field)
+                    val dbPicPaths = allCachesList.map { it.pic }.filter { it.isNotBlank() }.toSet()
+                    val picFilesOnDisk = picCacheDir.listFiles() ?: emptyArray()
+                    picFilesOnDisk.filter { file ->
+                        file.absolutePath !in dbPicPaths
+                    }.map { file ->
+                        async { file.delete() }
+                    }.awaitAll()
+
+                    // Remove lrc_cache orphaned files (no DB entry references them via lrc field)
+                    val dbLrcPaths = allCachesList.map { it.lrc }.filter { it.isNotBlank() }.toSet()
+                    val lrcFilesOnDisk = lrcCacheDir.listFiles() ?: emptyArray()
+                    lrcFilesOnDisk.filter { file ->
+                        file.absolutePath !in dbLrcPaths
                     }.map { file ->
                         async { file.delete() }
                     }.awaitAll()
@@ -498,9 +687,109 @@ class CacheManager private constructor(context: Context) {
         }
     }
 
+    // ============================================================
+    // Intelligent cache capacity management
+    // ============================================================
+
+    /**
+     * Enforce cache size limit by evicting oldest non-favorite caches first.
+     * Reads the cache limit from shared preferences (default 500 MB).
+     * Favorite songs are protected from eviction.
+     */
+    suspend fun enforceCacheLimit() {
+        withContext(Dispatchers.IO) {
+            try {
+                val limitMb = appContext.getSharedPreferences("melodyflow_settings", 0)
+                    .getInt("cache_limit_mb", 500)
+                val limitBytes = limitMb * 1024L * 1024L
+
+                val totalSize = cacheDao.getTotalSize()
+                if (totalSize <= limitBytes) return@withContext
+
+                // Get all favorite song IDs to protect them from eviction
+                val favoriteIds = MusicDatabase.getInstance(appContext)
+                    .favoriteDao().getAllFavoriteIds()
+
+                // Get non-favorite caches sorted by cachedAt (oldest first)
+                val nonFavoriteCaches = cacheDao.getNonFavoriteCachesOldestFirst(favoriteIds)
+
+                var freedBytes = 0L
+                val needToFree = totalSize - limitBytes
+
+                for (cache in nonFavoriteCaches) {
+                    if (freedBytes >= needToFree) break
+                    freedBytes += cache.fileSize
+                    removeCache(cache.songId)
+                    android.util.Log.i("CacheManager", "Evicted cache for ${cache.songId} (${cache.fileSize} bytes) to enforce limit")
+                }
+
+                if (freedBytes < needToFree && nonFavoriteCaches.isEmpty()) {
+                    // All caches are favorites but still over limit; evict oldest favorites as last resort
+                    val allCaches = cacheDao.getAllOnce().sortedBy { it.cachedAt }
+                    for (cache in allCaches) {
+                        if (freedBytes >= needToFree) break
+                        freedBytes += cache.fileSize
+                        removeCache(cache.songId)
+                        android.util.Log.i("CacheManager", "Evicted favorite cache for ${cache.songId} as last resort")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CacheManager", "Failed to enforce cache limit", e)
+            }
+        }
+    }
+
+    // ============================================================
+    // Cache metadata consistency check
+    // ============================================================
+
+    /**
+     * Verify cache consistency between database records and disk files.
+     * 1. Removes DB records whose files no longer exist on disk (ghost entries).
+     * 2. Removes orphaned files on disk that have no corresponding DB record.
+     */
+    suspend fun verifyCacheConsistency() {
+        withContext(Dispatchers.IO) {
+            try {
+                // 1. Find DB records without files (ghost entries)
+                val allCaches = cacheDao.getAllOnce()
+                for (cache in allCaches) {
+                    val musicFile = File(cache.filePath)
+                    if (!musicFile.exists()) {
+                        cacheDao.deleteBySongId(cache.songId)
+                        android.util.Log.i("CacheManager", "Removed ghost DB entry for ${cache.songId}")
+                    }
+                }
+
+                // 2. Find orphaned files in music, pic, lrc directories
+                // Re-fetch after ghost entry cleanup to get accurate path set
+                val remainingCaches = cacheDao.getAllOnce()
+                val allCachedPaths = remainingCaches.flatMap { cache ->
+                    listOfNotNull(
+                        cache.filePath,
+                        cache.pic.ifBlank { null },
+                        cache.lrc.ifBlank { null }
+                    )
+                }.toSet()
+
+                for (dir in listOf(cacheDir, picCacheDir, lrcCacheDir)) {
+                    dir.listFiles()?.forEach { file ->
+                        if (file.absolutePath !in allCachedPaths) {
+                            file.delete()
+                            android.util.Log.i("CacheManager", "Removed orphaned file: ${file.absolutePath}")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CacheManager", "Failed to verify cache consistency", e)
+            }
+        }
+    }
+
     /**
      * Scan disk for cached files and restore them to database.
-     * This is useful after database migration when cache records are lost.
+     * This is useful after database migration when cache records are lost,
+     * or after app reinstall when external storage still contains cached files.
      */
     suspend fun restoreCachedFilesFromDisk(): Int {
         return withContext(Dispatchers.IO) {
@@ -750,6 +1039,7 @@ class CacheManager private constructor(context: Context) {
                     } else {
                         // Audio file not found, try to re-download
                         android.util.Log.i("CacheManager", "Audio file not found for $songId, trying to re-download")
+                        // url is left null intentionally; cacheSong() will resolve it via MusicRepository API
                         val song = com.melodyflow.app.model.Song(
                             id = songId,
                             name = songName,

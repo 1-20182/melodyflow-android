@@ -10,25 +10,28 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.search.SearchBar
+import com.google.android.material.search.SearchView
 import com.melodyflow.app.MelodyFlowApp
 import com.melodyflow.app.R
 import com.melodyflow.app.adapter.SongAdapter
-import com.melodyflow.app.data.CacheManager
 import com.melodyflow.app.data.SilentCacheManager
 import com.melodyflow.app.model.Song
-import com.melodyflow.app.model.SongListHolder
 import com.melodyflow.app.service.MusicService
-import com.melodyflow.app.util.SearchHistoryManager
+import com.melodyflow.app.viewmodel.SearchViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SearchFragment : Fragment() {
 
-    private lateinit var etSearch: EditText
+    private lateinit var searchBar: SearchBar
+    private lateinit var searchView: SearchView
     private lateinit var tvEmpty: TextView
     private lateinit var progressBar: ProgressBar
     private lateinit var songAdapter: SongAdapter
@@ -36,7 +39,6 @@ class SearchFragment : Fragment() {
     private lateinit var rvSearchHistory: RecyclerView
     private lateinit var rvResults: RecyclerView
     private lateinit var historyAdapter: HistoryAdapter
-    private lateinit var historyManager: SearchHistoryManager
 
     private var currentSongResults = listOf<Song>()
     private val downloadingSongIds = mutableSetOf<String>()
@@ -45,9 +47,7 @@ class SearchFragment : Fragment() {
         (requireActivity().application as MelodyFlowApp).repository
     }
 
-    private val cacheManager by lazy {
-        CacheManager.getInstance(requireContext())
-    }
+    private val viewModel: SearchViewModel by viewModels()
 
     private var searchDebounceJob: Job? = null
     private val SEARCH_DEBOUNCE_MS = 300L
@@ -65,14 +65,16 @@ class SearchFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        historyManager = SearchHistoryManager(requireContext())
-
-        etSearch = view.findViewById(R.id.etSearch)
+        searchBar = view.findViewById(R.id.searchBar)
+        searchView = view.findViewById(R.id.searchView)
         progressBar = view.findViewById(R.id.progressBar)
         tvSearchHistory = view.findViewById(R.id.tvSearchHistory)
         rvSearchHistory = view.findViewById(R.id.rvSearchHistory)
         rvResults = view.findViewById(R.id.rvResults)
         tvEmpty = view.findViewById(R.id.tvEmpty)
+
+        // Connect SearchBar to SearchView (MD3 standard pattern)
+        searchView.setupWithSearchBar(searchBar)
 
         songAdapter = SongAdapter(
             onItemClick = { song, position ->
@@ -83,20 +85,31 @@ class SearchFragment : Fragment() {
             },
             onCacheClick = { song ->
                 cacheSong(song)
-            }
+            },
+            showCacheIndicator = true
         )
 
-        historyAdapter = HistoryAdapter({ query ->
-            etSearch.setText(query)
-            etSearch.setSelection(query.length)
-            performSearch()
-        }, { historyManager.clearHistory(); loadSearchHistory() })
+        historyAdapter = HistoryAdapter(
+            onItemClick = { query ->
+                searchView.editText.setText(query)
+                searchView.editText.setSelection(query.length)
+                performSearch(query)
+            },
+            onItemRemoveClick = { query ->
+                viewModel.removeHistoryItem(query)
+            },
+            onClearAllClick = {
+                viewModel.clearHistory()
+            }
+        )
         rvSearchHistory.adapter = historyAdapter
 
         rvResults.adapter = songAdapter
         rvResults.layoutManager = LinearLayoutManager(requireContext())
 
-        etSearch.setOnEditorActionListener { _, actionId, _ ->
+        // Handle search text changes with debounce and submit via SearchView's EditText
+        val searchEditText: EditText = searchView.editText
+        searchEditText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performSearch()
                 true
@@ -105,90 +118,105 @@ class SearchFragment : Fragment() {
             }
         }
 
-        etSearch.setOnKeyListener { _, _, event ->
+        searchEditText.setOnKeyListener { _, _, event ->
             if (event.action == android.view.KeyEvent.ACTION_DOWN) {
                 searchDebounceJob?.cancel()
                 searchDebounceJob = lifecycleScope.launch {
                     delay(SEARCH_DEBOUNCE_MS)
-                    val query = etSearch.text.toString().trim()
+                    val query = searchEditText.text.toString().trim()
                     if (query.isNotEmpty() && query != currentQuery) {
-                        performSearch()
+                        performSearchInternal(query)
                     }
                 }
             }
             false
         }
 
-        loadSearchHistory()
+        observeViewModel()
     }
 
     override fun onResume() {
         super.onResume()
-        refreshCacheState()
+        // Refresh cache state when returning to fragment
     }
 
-    private fun loadSearchHistory() {
-        val history = historyManager.getHistory()
-        rvResults.visibility = View.GONE
-        tvEmpty.visibility = View.GONE
-        progressBar.visibility = View.GONE
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                viewModel.state.collect { state ->
+                    // Update search history (inside SearchView)
+                    val history = state.searchHistory
+                    historyAdapter.submitList(history)
+                    tvSearchHistory.visibility = if (history.isNotEmpty()) View.VISIBLE else View.GONE
+                    rvSearchHistory.visibility = if (history.isNotEmpty()) View.VISIBLE else View.GONE
 
-        if (history.isNotEmpty()) {
-            tvSearchHistory.visibility = View.VISIBLE
-            rvSearchHistory.visibility = View.VISIBLE
-            historyAdapter.submitList(history)
-        } else {
-            tvSearchHistory.visibility = View.GONE
-            rvSearchHistory.visibility = View.GONE
-        }
-    }
+                    // Update search results (main content area)
+                    if (state.isLoading) {
+                        progressBar.visibility = View.VISIBLE
+                        tvEmpty.visibility = View.GONE
+                        rvResults.visibility = View.GONE
+                    } else if (state.results.isNotEmpty()) {
+                        progressBar.visibility = View.GONE
+                        currentSongResults = state.results
+                        songAdapter.submitList(state.results)
+                        tvEmpty.visibility = View.GONE
+                        rvResults.visibility = View.VISIBLE
+                    } else if (state.query.isNotEmpty()) {
+                        progressBar.visibility = View.GONE
+                        currentSongResults = state.results
+                        songAdapter.submitList(state.results)
+                        if (state.error != null) {
+                            tvEmpty.text = getString(R.string.error_network)
+                        } else {
+                            tvEmpty.text = "未找到相关歌曲"
+                        }
+                        tvEmpty.visibility = View.VISIBLE
+                        rvResults.visibility = View.GONE
+                    } else {
+                        progressBar.visibility = View.GONE
+                        tvEmpty.visibility = View.GONE
+                        rvResults.visibility = View.GONE
+                    }
 
-    private fun performSearch() {
-        val query = etSearch.text.toString().trim()
-        if (query.isEmpty()) return
-
-        searchDebounceJob?.cancel()
-        historyManager.addQuery(query)
-        currentQuery = query
-
-        progressBar.visibility = View.VISIBLE
-        tvSearchHistory.visibility = View.GONE
-        rvSearchHistory.visibility = View.GONE
-        tvEmpty.visibility = View.GONE
-
-        lifecycleScope.launch {
-            try {
-                val results = repository.search(query)
-                val songList = if (results is com.melodyflow.app.data.ApiResult.Success) results.data else emptyList()
-                currentSongResults = songList
-                songAdapter.submitList(songList)
-                progressBar.visibility = View.GONE
-                
-                if (songList.isEmpty()) {
-                    tvEmpty.text = "未找到相关歌曲"
-                    tvEmpty.visibility = View.VISIBLE
-                    rvResults.visibility = View.GONE
-                } else {
-                    tvEmpty.visibility = View.GONE
-                    rvResults.visibility = View.VISIBLE
+                    // Update cached song IDs
+                    songAdapter.setCached(state.cachedSongIds)
                 }
-            } catch (e: Exception) {
-                progressBar.visibility = View.GONE
-                tvEmpty.text = getString(R.string.error_network)
-                tvEmpty.visibility = View.VISIBLE
             }
         }
     }
 
+    /**
+     * Perform search without collapsing the SearchView.
+     * Used by the debounce listener for real-time search while typing.
+     */
+    private fun performSearchInternal(query: String) {
+        if (query.isEmpty()) return
+        searchDebounceJob?.cancel()
+        currentQuery = query
+        viewModel.search(query)
+    }
+
+    /**
+     * Perform search and collapse the SearchView to show results.
+     * Used when the user explicitly submits a search or taps a history item.
+     */
+    private fun performSearch(query: String = searchView.editText.text.toString().trim()) {
+        if (query.isEmpty()) return
+        searchDebounceJob?.cancel()
+        currentQuery = query
+        viewModel.search(query)
+        searchView.hide()
+    }
+
     private fun playSong(song: Song, position: Int) {
-        SongListHolder.songs = currentSongResults
+        (requireActivity().application as MelodyFlowApp).repository.setPendingPlaylist(currentSongResults)
         val serviceIntent = Intent(requireContext(), MusicService::class.java).apply {
             action = MusicService.ACTION_PLAY_SONG
             putExtra("song", song)
             putExtra("position", position)
         }
         requireContext().startService(serviceIntent)
-        
+
         // Open player activity to show playback interface
         val playerIntent = Intent(requireContext(), PlayerActivity::class.java).apply {
             putExtra("song", song)
@@ -223,33 +251,15 @@ class SearchFragment : Fragment() {
                 e.printStackTrace()
             } finally {
                 downloadingSongIds.remove(song.id)
-                refreshCacheState()
             }
         }
-    }
-
-    private var cachedSongsJob: kotlinx.coroutines.Job? = null
-
-    private fun refreshCacheState() {
-        cachedSongsJob?.cancel()
-        cachedSongsJob = lifecycleScope.launch {
-            val cachedSongsFlow = cacheManager.getCachedSongs()
-            cachedSongsFlow.collect { list ->
-                val ids = list.map { it.songId }.toSet()
-                songAdapter.setCached(ids)
-            }
-        }
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        cachedSongsJob?.cancel()
     }
 }
 
 class HistoryAdapter(
     private val onItemClick: (String) -> Unit,
-    private val onClearClick: () -> Unit
+    private val onItemRemoveClick: (String) -> Unit,
+    private val onClearAllClick: () -> Unit
 ) : androidx.recyclerview.widget.ListAdapter<String, HistoryAdapter.HistoryViewHolder>(object : androidx.recyclerview.widget.DiffUtil.ItemCallback<String>() {
     override fun areItemsTheSame(oldItem: String, newItem: String) = oldItem == newItem
     override fun areContentsTheSame(oldItem: String, newItem: String) = oldItem == newItem
@@ -273,7 +283,7 @@ class HistoryAdapter(
         fun bind(query: String) {
             tvQuery.text = query
             itemView.setOnClickListener { onItemClick(query) }
-            btnRemove.setOnClickListener { onClearClick() }
+            btnRemove.setOnClickListener { onItemRemoveClick(query) }
         }
     }
 }

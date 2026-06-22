@@ -3,7 +3,6 @@ package com.melodyflow.app.ui
 import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -11,13 +10,20 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.melodyflow.app.BuildConfig
 import com.melodyflow.app.R
+import com.melodyflow.app.data.BackupManager
 import com.melodyflow.app.data.CacheManager
+import com.melodyflow.app.data.LocalScanService
 import com.melodyflow.app.util.UpdateChecker
+import com.melodyflow.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -29,8 +35,19 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var tvCacheSize: TextView
     private lateinit var tvMusicCacheSize: TextView
+    private lateinit var tvTotalCacheSize: TextView
+    private lateinit var sliderCacheLimit: Slider
+    private lateinit var tvCacheLimitValue: TextView
+    private lateinit var btnClearAllCache: MaterialButton
     private lateinit var btnClearCache: MaterialButton
     private lateinit var btnClearMusicCache: MaterialButton
+    private lateinit var btnExportBackup: MaterialButton
+    private lateinit var btnImportBackup: MaterialButton
+    private lateinit var switchAutoBackup: SwitchMaterial
+    private lateinit var layoutCustomScanDirs: LinearLayout
+    private lateinit var tvNoCustomDirs: TextView
+    private lateinit var tvDefaultScanDirs: TextView
+    private lateinit var btnAddScanDir: MaterialButton
     private lateinit var ivBackgroundPreview: ImageView
     private lateinit var btnSelectBackground: MaterialButton
     private lateinit var btnResetBackground: MaterialButton
@@ -41,6 +58,10 @@ class SettingsActivity : AppCompatActivity() {
 
     private val bgFile: File get() = File(filesDir, "custom_background.jpg")
     private val cacheManager: CacheManager by lazy { CacheManager.getInstance(this) }
+    private val backupManager: BackupManager by lazy { BackupManager.getInstance(this) }
+    private val localScanService: LocalScanService by lazy { LocalScanService.getInstance(this) }
+
+    private lateinit var viewModel: SettingsViewModel
 
     private val gradientPresets = listOf(
         intArrayOf(0xFF667EEA.toInt(), 0xFF764BA2.toInt()),    // Purple gradient
@@ -57,40 +78,84 @@ class SettingsActivity : AppCompatActivity() {
         uri?.let { saveBackground(it) }
     }
 
+    private val pickBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { importBackupFromUri(it) }
+    }
+
+    private val pickDirLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        uri?.let { addScanDirectory(it) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
         com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
 
+        viewModel = ViewModelProvider(this).get(SettingsViewModel::class.java)
+
         val toolbar: MaterialToolbar = findViewById(R.id.toolbar)
         toolbar.setNavigationOnClickListener { finish() }
 
+        // --- Cache Management ---
         tvCacheSize = findViewById(R.id.tvCacheSize)
         tvMusicCacheSize = findViewById(R.id.tvMusicCacheSize)
+        tvTotalCacheSize = findViewById(R.id.tvTotalCacheSize)
+        sliderCacheLimit = findViewById(R.id.sliderCacheLimit)
+        tvCacheLimitValue = findViewById(R.id.tvCacheLimitValue)
+        btnClearAllCache = findViewById(R.id.btnClearAllCache)
         btnClearCache = findViewById(R.id.btnClearCache)
         btnClearMusicCache = findViewById(R.id.btnClearMusicCache)
+
+        // --- Backup & Restore ---
+        btnExportBackup = findViewById(R.id.btnExportBackup)
+        btnImportBackup = findViewById(R.id.btnImportBackup)
+        switchAutoBackup = findViewById(R.id.switchAutoBackup)
+
+        // --- Scan Directory Management ---
+        layoutCustomScanDirs = findViewById(R.id.layoutCustomScanDirs)
+        tvNoCustomDirs = findViewById(R.id.tvNoCustomDirs)
+        tvDefaultScanDirs = findViewById(R.id.tvDefaultScanDirs)
+        btnAddScanDir = findViewById(R.id.btnAddScanDir)
+
+        // --- Background ---
         ivBackgroundPreview = findViewById(R.id.ivBackgroundPreview)
         btnSelectBackground = findViewById(R.id.btnSelectBackground)
         btnResetBackground = findViewById(R.id.btnResetBackground)
         gradientPresetGroup = findViewById(R.id.gradientPresetGroup)
+
+        // --- Startup Page ---
         rgStartupPage = findViewById(R.id.rgStartupPage)
         rbStartupHome = findViewById(R.id.rbStartupHome)
         rbStartupAI = findViewById(R.id.rbStartupAI)
 
+        // Initialize data
         updateCacheSize()
-        updateMusicCacheSize()
+        setupCacheLimitSlider()
         loadBackgroundPreview()
         setupGradientPresets()
         setupStartupPageSettings()
         setupVersionDisplay()
+        setupBackupSettings()
+        setupScanDirectoryManagement()
 
+        // --- Click listeners ---
+        btnClearAllCache.setOnClickListener { clearAllCache() }
         btnClearCache.setOnClickListener { clearCache() }
         btnClearMusicCache.setOnClickListener { clearMusicCache() }
+        btnExportBackup.setOnClickListener { exportBackup() }
+        btnImportBackup.setOnClickListener { importBackup() }
         btnSelectBackground.setOnClickListener {
             pickImageLauncher.launch("image/*")
         }
         btnResetBackground.setOnClickListener { resetBackground() }
+        btnAddScanDir.setOnClickListener {
+            pickDirLauncher.launch(null)
+        }
         gradientPresetGroup.setOnCheckedChangeListener { _, checkedId ->
             applyGradientPreset(checkedId)
         }
@@ -111,11 +176,106 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCheckUpdate)?.setOnClickListener {
             checkForUpdate()
         }
+
+        observeViewModel()
     }
 
     override fun onResume() {
         super.onResume()
         com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
+    }
+
+    private fun observeViewModel() {
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
+                viewModel.state.collect { state ->
+                    // Update music cache info from ViewModel
+                    tvMusicCacheSize.text = "${formatSize(state.cacheSize)} (${state.cacheCount} 首歌曲)"
+
+                    // Update cache limit slider
+                    sliderCacheLimit.value = state.cacheLimitMb.toFloat().coerceIn(100f, 2000f)
+                    tvCacheLimitValue.text = "${state.cacheLimitMb} MB"
+
+                    // Update auto backup switch
+                    switchAutoBackup.isChecked = state.isAutoBackupEnabled
+
+                    // Update scan directories
+                    refreshCustomScanDirsFromState(state.scanDirectories)
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // Cache Management
+    // ============================================================
+
+    private fun setupCacheLimitSlider() {
+        sliderCacheLimit.addOnChangeListener { _, value, fromUser ->
+            if (fromUser) {
+                val limitMb = value.toInt()
+                tvCacheLimitValue.text = "${limitMb} MB"
+            }
+        }
+
+        sliderCacheLimit.addOnSliderTouchListener(object : Slider.OnSliderTouchListener {
+            override fun onStartTrackingTouch(slider: Slider) {}
+            override fun onStopTrackingTouch(slider: Slider) {
+                val limitMb = slider.value.toInt()
+                viewModel.setCacheLimitMb(limitMb)
+                // Enforce the new limit
+                lifecycleScope.launch {
+                    cacheManager.enforceCacheLimit()
+                    updateMusicCacheSize()
+                    updateTotalCacheSize()
+                }
+            }
+        })
+    }
+
+    private fun updateTotalCacheSize() {
+        CoroutineScope(Dispatchers.IO).launch {
+            var totalSize = 0L
+
+            // Image cache size
+            val imageCacheDir = File(applicationContext.cacheDir, "image_manager_disk_cache")
+            if (imageCacheDir.exists()) {
+                totalSize += getFolderSize(imageCacheDir)
+            }
+
+            // Music cache size
+            totalSize += cacheManager.getCacheSize()
+
+            val formatted = formatSize(totalSize)
+            withContext(Dispatchers.Main) {
+                tvTotalCacheSize.text = formatted
+            }
+        }
+    }
+
+    private fun clearAllCache() {
+        AlertDialog.Builder(this)
+            .setTitle("清除全部缓存")
+            .setMessage("确定要清除所有缓存（图片缓存和音乐缓存）吗？此操作不可撤销。")
+            .setPositiveButton("清除") { _, _ ->
+                lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        // Clear image cache
+                        try {
+                            com.bumptech.glide.Glide.get(this@SettingsActivity).clearDiskCache()
+                        } catch (e: Exception) {
+                            // Ignore
+                        }
+                        // Clear music cache via ViewModel
+                        viewModel.clearAllCache()
+                    }
+                    updateCacheSize()
+                    updateTotalCacheSize()
+                    Toast.makeText(this@SettingsActivity, "全部缓存已清除", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     private fun setupGradientPresets() {
@@ -161,6 +321,222 @@ class SettingsActivity : AppCompatActivity() {
         val tvVersion = findViewById<TextView>(R.id.tvVersion)
         tvVersion.text = getString(R.string.setting_version, BuildConfig.VERSION_NAME)
     }
+
+    // ============================================================
+    // Backup & Restore
+    // ============================================================
+
+    private fun setupBackupSettings() {
+        switchAutoBackup.setOnCheckedChangeListener { _, isChecked ->
+            viewModel.setAutoBackupEnabled(isChecked)
+            Toast.makeText(this, if (isChecked) "自动备份已开启" else "自动备份已关闭", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun exportBackup() {
+        btnExportBackup.isEnabled = false
+        btnExportBackup.text = "导出中..."
+
+        lifecycleScope.launch {
+            try {
+                val file = backupManager.exportBackup()
+                Toast.makeText(
+                    this@SettingsActivity,
+                    "备份已导出至: ${file.absolutePath}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@SettingsActivity, "导出失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                btnExportBackup.isEnabled = true
+                btnExportBackup.text = "导出备份"
+            }
+        }
+    }
+
+    private fun importBackup() {
+        pickBackupLauncher.launch("application/json")
+    }
+
+    private fun importBackupFromUri(uri: Uri) {
+        btnImportBackup.isEnabled = false
+        btnImportBackup.text = "导入中..."
+
+        lifecycleScope.launch {
+            try {
+                val file = copyUriToTempFile(uri)
+                if (file == null) {
+                    Toast.makeText(this@SettingsActivity, "无法读取备份文件", Toast.LENGTH_SHORT).show()
+                    return@launch
+                }
+
+                // Preview the backup first
+                val preview = backupManager.previewBackup(file)
+                if (preview == null) {
+                    Toast.makeText(this@SettingsActivity, "无效的备份文件", Toast.LENGTH_SHORT).show()
+                    file.delete()
+                    return@launch
+                }
+
+                // Show confirmation dialog with preview info
+                val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                val dateStr = dateFormat.format(java.util.Date(preview.exportDate))
+                val message = buildString {
+                    append("备份日期: $dateStr\n")
+                    append("收藏: ${preview.favoriteCount} 首\n")
+                    append("播放历史: ${preview.historyCount} 条\n")
+                    append("日历事件: ${preview.calendarEventCount} 个\n")
+                    append("日记: ${preview.diaryCount} 篇\n")
+                    append("AI配置: ${if (preview.hasAiConfig) "有" else "无"}\n\n")
+                    append("确定要导入此备份吗？")
+                }
+
+                AlertDialog.Builder(this@SettingsActivity)
+                    .setTitle("导入备份")
+                    .setMessage(message)
+                    .setPositiveButton("导入") { _, _ ->
+                        lifecycleScope.launch {
+                            val success = backupManager.importBackup(
+                                file,
+                                BackupManager.ImportOptions()
+                            )
+                            if (success) {
+                                Toast.makeText(this@SettingsActivity, "备份导入成功", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(this@SettingsActivity, "备份导入失败", Toast.LENGTH_SHORT).show()
+                            }
+                            file.delete()
+                        }
+                    }
+                    .setNegativeButton("取消") { _, _ ->
+                        file.delete()
+                    }
+                    .show()
+            } catch (e: Exception) {
+                Toast.makeText(this@SettingsActivity, "导入失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                btnImportBackup.isEnabled = true
+                btnImportBackup.text = "导入备份"
+            }
+        }
+    }
+
+    private suspend fun copyUriToTempFile(uri: Uri): File? = withContext(Dispatchers.IO) {
+        try {
+            val inputStream = contentResolver.openInputStream(uri) ?: return@withContext null
+            val tempFile = File(cacheDir, "import_backup_temp.json")
+            tempFile.outputStream().use { output ->
+                inputStream.use { input ->
+                    input.copyTo(output)
+                }
+            }
+            tempFile
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // ============================================================
+    // Scan Directory Management
+    // ============================================================
+
+    private fun setupScanDirectoryManagement() {
+        // Display default directories
+        val defaultDirs = localScanService.getDefaultScanDirectories()
+        if (defaultDirs.isEmpty()) {
+            tvDefaultScanDirs.text = "无可用默认目录"
+        } else {
+            tvDefaultScanDirs.text = defaultDirs.joinToString("\n") { it.absolutePath }
+        }
+
+        // Custom directories are loaded from ViewModel state in observeViewModel()
+    }
+
+    private fun refreshCustomScanDirsFromState(scanDirs: List<String>) {
+        layoutCustomScanDirs.removeAllViews()
+
+        if (scanDirs.isEmpty()) {
+            tvNoCustomDirs.visibility = View.VISIBLE
+        } else {
+            tvNoCustomDirs.visibility = View.GONE
+            for (dirPath in scanDirs) {
+                val itemView = layoutInflater.inflate(
+                    android.R.layout.simple_list_item_2,
+                    layoutCustomScanDirs,
+                    false
+                )
+                val dirFile = File(dirPath)
+                itemView.findViewById<TextView>(android.R.id.text1).apply {
+                    text = dirFile.name
+                    setTextColor(getColor(R.color.text_primary))
+                    textSize = 14f
+                }
+                itemView.findViewById<TextView>(android.R.id.text2).apply {
+                    text = dirPath
+                    setTextColor(getColor(R.color.text_secondary))
+                    textSize = 12f
+                }
+                itemView.setOnClickListener {
+                    showRemoveDirectoryDialog(dirPath)
+                }
+                layoutCustomScanDirs.addView(itemView)
+            }
+        }
+    }
+
+    private fun addScanDirectory(uri: Uri) {
+        // Convert tree URI to a file path
+        val path = uri.path ?: return
+        // Extract the actual path from the document tree URI
+        // Format: /tree/primary:Music -> /storage/emulated/0/Music
+        val filePath = convertUriToFilePath(path)
+        if (filePath == null) {
+            Toast.makeText(this, "无法识别目录路径", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        viewModel.addScanDirectory(filePath)
+        Toast.makeText(this, "目录已添加: $filePath", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun convertUriToFilePath(uriPath: String): String? {
+        // Handle common URI path formats from SAF
+        // /tree/primary:Music -> /storage/emulated/0/Music
+        // /tree/XXXX-XXXX:Music -> /storage/XXXX-XXXX/Music
+        val colonIndex = uriPath.indexOf(':')
+        if (colonIndex == -1) return null
+
+        val treePrefix = uriPath.substring(0, colonIndex)
+        val relativePath = uriPath.substring(colonIndex + 1)
+
+        val basePath = when {
+            treePrefix.endsWith("/primary") -> "/storage/emulated/0"
+            treePrefix.contains("/") -> {
+                // Extract volume ID like /tree/XXXX-XXXX -> /storage/XXXX-XXXX
+                val volumeId = treePrefix.substringAfterLast("/")
+                "/storage/$volumeId"
+            }
+            else -> return null
+        }
+
+        return if (relativePath.isNotEmpty()) "$basePath/$relativePath" else basePath
+    }
+
+    private fun showRemoveDirectoryDialog(dirPath: String) {
+        AlertDialog.Builder(this)
+            .setTitle("移除目录")
+            .setMessage("确定要从扫描目录中移除以下路径吗？\n\n$dirPath")
+            .setPositiveButton("移除") { _, _ ->
+                viewModel.removeScanDirectory(dirPath)
+                Toast.makeText(this, "目录已移除", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ============================================================
+    // Background & Gradient
+    // ============================================================
 
     private fun applyGradientPreset(checkedId: Int) {
         val index = checkedId - 1
@@ -215,6 +591,7 @@ class SettingsActivity : AppCompatActivity() {
                 com.bumptech.glide.Glide.get(this@SettingsActivity).clearDiskCache()
                 runOnUiThread {
                     updateCacheSize()
+                    updateTotalCacheSize()
                     Toast.makeText(this, "图片缓存已清除", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
@@ -227,9 +604,10 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun clearMusicCache() {
         CoroutineScope(Dispatchers.IO).launch {
-            cacheManager.clearAllCache()
+            viewModel.clearAllCache()
             withContext(Dispatchers.Main) {
                 updateMusicCacheSize()
+                updateTotalCacheSize()
                 Toast.makeText(this@SettingsActivity, "音乐缓存已清除", Toast.LENGTH_SHORT).show()
             }
         }
@@ -250,15 +628,15 @@ class SettingsActivity : AppCompatActivity() {
             }
             if (!bitmap.isRecycled) bitmap.recycle()
             gradientPresetGroup.clearCheck()
-            
+
             // Clear background cache so new background takes effect immediately
             com.melodyflow.app.util.BackgroundManager.clearCache()
             // Apply new background to this activity
             com.melodyflow.app.util.BackgroundManager.applyToActivity(this)
-            
+
             // Send broadcast to notify other activities to update background
             sendBroadcast(Intent("com.melodyflow.app.BACKGROUND_CHANGED"))
-            
+
             loadBackgroundPreview()
             Toast.makeText(this, "背景已设置", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
@@ -315,6 +693,10 @@ class SettingsActivity : AppCompatActivity() {
         Toast.makeText(this, "已恢复默认背景", Toast.LENGTH_SHORT).show()
     }
 
+    // ============================================================
+    // Update Check
+    // ============================================================
+
     private fun checkForUpdate() {
         val btn = findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCheckUpdate)
         btn?.isEnabled = false
@@ -357,6 +739,10 @@ class SettingsActivity : AppCompatActivity() {
 
         dialog.show()
     }
+
+    // ============================================================
+    // Utility
+    // ============================================================
 
     private fun getFolderSize(file: File): Long {
         var size = 0L

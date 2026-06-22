@@ -379,8 +379,8 @@ class AIRecommendationFragment : Fragment() {
                 showLoading(false)
 
                 if (songs.isNotEmpty()) {
-                    // 保存到SongListHolder并播放
-                    SongListHolder.songs = songs
+                    // 保存到Repository并播放
+                    repository.setPendingPlaylist(songs)
 
                     val intent = Intent(requireContext(), PlayerActivity::class.java).apply {
                         putExtra("clickIndex", 0)

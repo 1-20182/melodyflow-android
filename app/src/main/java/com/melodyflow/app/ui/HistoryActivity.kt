@@ -17,7 +17,6 @@ import com.melodyflow.app.MelodyFlowApp
 import com.melodyflow.app.R
 import com.melodyflow.app.adapter.SongAdapter
 import com.melodyflow.app.model.Song
-import com.melodyflow.app.model.SongListHolder
 import com.melodyflow.app.service.MusicService
 import kotlinx.coroutines.launch
 
@@ -112,7 +111,7 @@ class HistoryActivity : AppCompatActivity() {
     }
 
     private fun playSong(song: Song, position: Int) {
-        SongListHolder.songs = currentSongs.toList()
+        (application as MelodyFlowApp).repository.setPendingPlaylist(currentSongs.toList())
         val serviceIntent = Intent(this, MusicService::class.java).apply {
             action = MusicService.ACTION_PLAY_SONG
             putExtra("song", song)

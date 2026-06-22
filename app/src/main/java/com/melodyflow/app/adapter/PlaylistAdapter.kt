@@ -20,6 +20,21 @@ class PlaylistAdapter(
         notifyDataSetChanged()
     }
 
+    /**
+     * 高效更新高亮位置，仅通知旧位置和新位置的 item 刷新，
+     * 避免重建整个 Adapter 或全局刷新。
+     */
+    fun updateHighlight(newPosition: Int) {
+        val oldPosition = currentList.indexOfFirst { it.id == currentSongId }
+        currentSongId = if (newPosition in 0 until currentList.size) currentList[newPosition].id else null
+        if (oldPosition >= 0) {
+            notifyItemChanged(oldPosition)
+        }
+        if (newPosition >= 0 && newPosition < currentList.size) {
+            notifyItemChanged(newPosition)
+        }
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ItemPlaylistSongBinding.inflate(
             LayoutInflater.from(parent.context),
