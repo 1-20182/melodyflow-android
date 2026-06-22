@@ -103,7 +103,8 @@
         <activity
             android:name=".ui.AISettingsActivity"
             android:exported="true"
-            android:screenOrientation="unspecified" />
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.MelodyFlow.NoActionBar" />
 
         <activity
             android:name=".ui.AIRecommendationActivity"
@@ -113,7 +114,8 @@
         <activity
             android:name=".ui.PlaylistActivity"
             android:exported="false"
-            android:screenOrientation="unspecified" />
+            android:screenOrientation="unspecified"
+            android:theme="@style/Theme.MelodyFlow.NoActionBar" />
 
         <service
             android:name=".service.MusicService"
